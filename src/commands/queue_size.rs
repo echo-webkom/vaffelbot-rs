@@ -13,7 +13,7 @@ impl QueueSizeCommand {
         }
 
         let message = match queue.index_of(user_id) {
-            Some(index) => format!("Du er {} i køen", index),
+            Some(index) => format!("Du er {} i køen", index + 1),
             None => "Du er ikke i køen".to_string(),
         };
 

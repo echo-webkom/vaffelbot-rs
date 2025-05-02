@@ -45,10 +45,7 @@ impl WaffleQueue {
 
     pub fn size(&self) -> usize {
         let mut con = self.redis.get_connection().unwrap();
-        redis::cmd("ZCARD")
-            .arg(QUEUE_NAME)
-            .query(&mut con)
-            .unwrap_or(0)
+        con.llen(QUEUE_NAME).unwrap_or(0) as usize
     }
 
     pub fn push(&self, value: String) -> usize {

@@ -13,13 +13,13 @@ impl WaffleCommand {
         }
 
         let message = match queue.index_of(user_id.clone()) {
-            Some(index) => format!("Du er {} i køen", index),
+            Some(index) => {
+                format!("Du er {} i køen", index + 1)
+            }
             None => {
                 queue.push(user_id);
-                format!(
-                    "Du er nå i køen. Det er {} personer foran deg",
-                    queue.size()
-                )
+                let size = queue.size();
+                format!("Du er nå i køen. Det er {} personer foran deg", size)
             }
         };
 
