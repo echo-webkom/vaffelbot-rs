@@ -1,0 +1,30 @@
+HOW TO INSTALL
+
+https://discord.com/oauth2/authorize?client_id=1367651749262921868&permissions=277025458240&integration_type=0&scope=bot
+
+COMMANDS
+
+/kø
+
+Sjekker hvor i køen brukeren er.
+
+/vaffel
+
+Bestiller en vaffel og setter deg i køen. Om du allerede er i køen, vil den bare
+vise hvor i øken brukeren er.
+
+/stekt [number]
+
+Steker antall vafler, og fjerner de fra køen.
+
+/tøm
+
+Fjerner alle vafler fra køen. Brukes når det er tomt for vafler.
+
+/stopp
+
+Stopper steking av vafler, lar ingen kommer inn i køen.
+
+/start
+
+Starter steking av vafler, lar alle komme inn i køen.
