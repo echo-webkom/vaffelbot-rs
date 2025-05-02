@@ -1,0 +1,28 @@
+name: 🐳 Build Docker
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-vertex:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🔍 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🐳 Build Docker image
+        run: |
+          docker build \
+            -t ghcr.io/echo-webkom/vaffelbot:latest \
+            -f ./Dockerfile .
+
+      - name: 🔐 Authenticate Docker
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: 🚀 Push Docker image
+        run: |
+          docker push ghcr.io/echo-webkom/vaffelbot:latest
