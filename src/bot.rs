@@ -5,10 +5,13 @@ use serenity::model::gateway::Ready;
 use serenity::model::id::GuildId;
 use serenity::prelude::*;
 
-use crate::commands::{
-    BakeCommand, CloseCommand, EmptyCommand, OpenCommand, PingCommand, QueueSizeCommand,
-    WaffleCommand,
-};
+use crate::commands::bake::BakeCommand;
+use crate::commands::close::CloseCommand;
+use crate::commands::empty::EmptyCommand;
+use crate::commands::open::OpenCommand;
+use crate::commands::ping::PingCommand;
+use crate::commands::queue_size::QueueSizeCommand;
+use crate::commands::waffle::WaffleCommand;
 use crate::queue::WaffleQueue;
 
 pub struct WaffleBot {
