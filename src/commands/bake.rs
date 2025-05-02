@@ -31,37 +31,34 @@ impl BakeCommand {
 
         let amount = amount.unwrap_or(1) as usize;
 
-        let mut baked = 0;
-        let mut baked_users = vec![];
-
-        let n = queue.size().max(amount);
+        let mut baked = vec![];
+        let n = queue.size().min(amount);
 
         for _ in 0..n {
             if let Some(user_id) = queue.pop() {
-                baked += 1;
-                baked_users.push(user_id);
+                baked.push(user_id);
             } else {
                 break;
             }
         }
 
-        let message = if baked == 0 {
+        let message = if baked.len() == 0 {
             "Ingen vafler å steke".to_string()
         } else {
             let mut msg = MessageBuilder::new();
-            msg.push("Stekte ").push(baked.to_string());
+            msg.push("Stekte ").push(baked.len().to_string());
 
-            if baked == 1 {
+            if baked.len() == 1 {
                 msg.push(" en vaffel til: ");
-                let user_id = UserId::new(baked_users[0].parse::<u64>().unwrap());
+                let user_id = UserId::new(baked[0].parse::<u64>().unwrap());
                 msg.mention(&user_id);
             } else {
                 msg.push(" vafler til: ");
 
-                for (i, user_id) in baked_users.iter().enumerate() {
+                for (i, user_id) in baked.iter().enumerate() {
                     let user_id = UserId::new(user_id.parse::<u64>().unwrap());
 
-                    if i == baked_users.len() - 1 {
+                    if i == baked.len() - 1 {
                         msg.push(" og ").mention(&user_id);
                     } else {
                         msg.mention(&user_id).push(", ");
