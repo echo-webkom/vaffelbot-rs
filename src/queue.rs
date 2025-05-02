@@ -1,7 +1,4 @@
-use std::{
-    num::NonZero,
-    sync::atomic::{AtomicBool, Ordering},
-};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use redis::Commands;
 
@@ -62,9 +59,8 @@ impl WaffleQueue {
 
     pub fn pop(&self) -> Option<String> {
         let mut con = self.redis.get_connection().unwrap();
-        con.lpop(QUEUE_NAME, Some(NonZero::new(1).unwrap()))
-            .ok()
-            .flatten()
+        let result: redis::RedisResult<Vec<String>> = con.lpop(QUEUE_NAME, None);
+        result.ok().and_then(|mut vec| vec.pop())
     }
 
     pub fn drain(&self) -> Vec<String> {
@@ -85,5 +81,103 @@ impl WaffleQueue {
     pub fn list(&self) -> Vec<String> {
         let mut con = self.redis.get_connection().unwrap();
         con.lrange(QUEUE_NAME, 0, -1).unwrap_or_else(|_| vec![])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use testcontainers::runners::SyncRunner;
+    use testcontainers_modules::redis::Redis;
+
+    #[test]
+    fn test_push_and_pop() {
+        let node = Redis::default().start().unwrap();
+        let host_ip = node.get_host().unwrap();
+        let host_port = node.get_host_port_ipv4(6379).unwrap();
+        let url = format!("redis://{host_ip}:{host_port}");
+        let client = redis::Client::open(url).unwrap();
+        let queue = WaffleQueue::new(client);
+
+        queue.push("foo".to_string());
+        queue.push("bar".to_string());
+
+        assert_eq!(queue.size(), 2);
+        assert_eq!(queue.index_of("bar".to_string()), Some(1));
+
+        let popped = queue.pop();
+        assert_eq!(popped, Some("foo".to_string()));
+        assert_eq!(queue.size(), 1);
+
+        let remaining = queue.list();
+        assert_eq!(remaining, vec!["bar".to_string()]);
+    }
+
+    #[test]
+    fn test_drain() {
+        let node = Redis::default().start().unwrap();
+        let host_ip = node.get_host().unwrap();
+        let host_port = node.get_host_port_ipv4(6379).unwrap();
+        let url = format!("redis://{host_ip}:{host_port}");
+        let client = redis::Client::open(url).unwrap();
+        let queue = WaffleQueue::new(client);
+
+        queue.push("foo".to_string());
+        queue.push("bar".to_string());
+
+        let drained = queue.drain();
+        assert_eq!(drained, vec!["foo".to_string(), "bar".to_string()]);
+        assert_eq!(queue.size(), 0);
+    }
+
+    #[test]
+    fn test_list() {
+        let node = Redis::default().start().unwrap();
+        let host_ip = node.get_host().unwrap();
+        let host_port = node.get_host_port_ipv4(6379).unwrap();
+        let url = format!("redis://{host_ip}:{host_port}");
+        let client = redis::Client::open(url).unwrap();
+        let queue = WaffleQueue::new(client);
+
+        queue.push("foo".to_string());
+        queue.push("bar".to_string());
+
+        let list = queue.list();
+        assert_eq!(list, vec!["foo".to_string(), "bar".to_string()]);
+    }
+
+    #[test]
+    fn test_index_of() {
+        let node = Redis::default().start().unwrap();
+        let host_ip = node.get_host().unwrap();
+        let host_port = node.get_host_port_ipv4(6379).unwrap();
+        let url = format!("redis://{host_ip}:{host_port}");
+        let client = redis::Client::open(url).unwrap();
+        let queue = WaffleQueue::new(client);
+
+        queue.push("foo".to_string());
+        queue.push("bar".to_string());
+
+        assert_eq!(queue.index_of("foo".to_string()), Some(0));
+        assert_eq!(queue.index_of("bar".to_string()), Some(1));
+        assert_eq!(queue.index_of("baz".to_string()), None);
+    }
+
+    #[test]
+    fn test_size() {
+        let node = Redis::default().start().unwrap();
+        let host_ip = node.get_host().unwrap();
+        let host_port = node.get_host_port_ipv4(6379).unwrap();
+        let url = format!("redis://{host_ip}:{host_port}");
+        let client = redis::Client::open(url).unwrap();
+        let queue = WaffleQueue::new(client);
+
+        assert_eq!(queue.size(), 0);
+
+        queue.push("foo".to_string());
+        queue.push("bar".to_string());
+
+        assert_eq!(queue.size(), 2);
     }
 }

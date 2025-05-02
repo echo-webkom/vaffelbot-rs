@@ -9,6 +9,13 @@ HOW TO INSTALL
 
 https://discord.com/oauth2/authorize?client_id=1367651749262921868&permissions=277025458240&integration_type=0&scope=bot
 
+
+HOW TO TEST
+-----------
+
+You can test the application with `cargo test -- --test-threads=1`. Remember to
+have docker running.
+
 COMMANDS
 --------
 
