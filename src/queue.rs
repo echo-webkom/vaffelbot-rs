@@ -1,4 +1,7 @@
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::{
+    num::NonZero,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
 use redis::Commands;
 
@@ -59,7 +62,9 @@ impl WaffleQueue {
 
     pub fn pop(&self) -> Option<String> {
         let mut con = self.redis.get_connection().unwrap();
-        con.lpop(QUEUE_NAME, None).ok().flatten()
+        con.lpop(QUEUE_NAME, Some(NonZero::new(1).unwrap()))
+            .ok()
+            .flatten()
     }
 
     pub fn drain(&self) -> Vec<String> {
