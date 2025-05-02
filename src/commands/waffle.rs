@@ -17,8 +17,8 @@ impl WaffleCommand {
                 format!("Du er {} i køen", index + 1)
             }
             None => {
-                queue.push(user_id);
                 let size = queue.size();
+                queue.push(user_id);
                 format!("Du er nå i køen. Det er {} personer foran deg", size)
             }
         };
