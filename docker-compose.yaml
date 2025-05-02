@@ -4,3 +4,20 @@ services:
     container_name: redis
     ports:
       - "6379:6379"
+
+  vaffelbot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vaffelbot
+    ports:
+      - 3000:3000
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - GUILD_ID=your_guild_id_here
+      - DISCORD_TOKEN=your_discord_token_here
+    depends_on:
+      - redis
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
