@@ -66,6 +66,10 @@ impl BakeCommand {
                 }
             }
 
+            if amount > n {
+                msg.push(format!(" ({} vafler til overs)", amount - n));
+            }
+
             msg.build()
         };
 
