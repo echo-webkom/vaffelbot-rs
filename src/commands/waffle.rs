@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use serenity::all::{CreateCommand, CreateInteractionResponse};
 
 use crate::queue::WaffleQueue;
@@ -7,7 +9,7 @@ use super::{create_ephemeral_response, create_response};
 pub struct WaffleCommand;
 
 impl WaffleCommand {
-    pub fn run(queue: &WaffleQueue, user_id: String) -> CreateInteractionResponse {
+    pub fn run(queue: Arc<WaffleQueue>, user_id: String) -> CreateInteractionResponse {
         if !queue.is_open() {
             return create_ephemeral_response("Bestilling er stengt");
         }

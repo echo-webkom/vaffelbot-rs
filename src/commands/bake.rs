@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use serenity::all::{
     CommandOptionType, CreateCommand, CreateCommandOption, CreateInteractionResponse,
     MessageBuilder, UserId,
@@ -11,7 +13,7 @@ pub struct BakeCommand;
 
 impl BakeCommand {
     pub fn run(
-        queue: &WaffleQueue,
+        queue: Arc<WaffleQueue>,
         amount: Option<i64>,
         is_oracle: bool,
     ) -> CreateInteractionResponse {

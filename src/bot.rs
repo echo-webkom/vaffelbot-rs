@@ -1,9 +1,12 @@
+use std::sync::Arc;
+
 use serenity::all::UserId;
 use serenity::async_trait;
 use serenity::model::application::Interaction;
 use serenity::model::gateway::Ready;
 use serenity::model::id::GuildId;
 use serenity::prelude::*;
+use tracing::{debug, error, info};
 
 use crate::commands::bake::BakeCommand;
 use crate::commands::close::CloseCommand;
@@ -17,11 +20,11 @@ use crate::queue::WaffleQueue;
 pub struct WaffleBot {
     token: String,
     guild_id: GuildId,
-    queue: WaffleQueue,
+    queue: Arc<WaffleQueue>,
 }
 
 impl WaffleBot {
-    pub fn new(token: String, guild_id: u64, queue: WaffleQueue) -> Self {
+    pub fn new(token: String, guild_id: u64, queue: Arc<WaffleQueue>) -> Self {
         let guild_id = GuildId::new(guild_id);
 
         Self {
@@ -65,29 +68,29 @@ impl EventHandler for WaffleBot {
 
             let content = match command.data.name.as_str() {
                 "ping" => Some(PingCommand::run()),
-                "kø" => Some(QueueSizeCommand::run(&self.queue, user_id)),
-                "vaffel" => Some(WaffleCommand::run(&self.queue, user_id)),
+                "kø" => Some(QueueSizeCommand::run(self.queue.clone(), user_id)),
+                "vaffel" => Some(WaffleCommand::run(self.queue.clone(), user_id)),
                 "stekt" => Some(BakeCommand::run(
-                    &self.queue,
+                    self.queue.clone(),
                     command.data.options[0].value.as_i64(),
                     is_oracle,
                 )),
-                "start" => Some(OpenCommand::run(&self.queue, is_oracle)),
-                "stopp" => Some(CloseCommand::run(&self.queue, is_oracle)),
-                "tøm" => Some(EmptyCommand::run(&self.queue, is_oracle)),
+                "start" => Some(OpenCommand::run(self.queue.clone(), is_oracle)),
+                "stopp" => Some(CloseCommand::run(self.queue.clone(), is_oracle)),
+                "tøm" => Some(EmptyCommand::run(self.queue.clone(), is_oracle)),
                 _ => None,
             };
 
             if let Some(content) = content {
                 if let Err(why) = command.create_response(&ctx.http, content).await {
-                    println!("Cannot respond to slash command: {why}");
+                    debug!("Cannot respond to slash command: {why}");
                 }
             }
         }
     }
 
     async fn ready(&self, ctx: Context, ready: Ready) {
-        println!("{} is connected!", ready.user.name);
+        info!("{} is connected!", ready.user.name);
 
         let commands = self
             .guild_id
@@ -106,9 +109,9 @@ impl EventHandler for WaffleBot {
             .await;
 
         if let Err(why) = commands {
-            println!("Error registering commands: {why}");
+            error!("Error registering commands: {why}");
         } else {
-            println!("Commands registered successfully");
+            info!("Commands registered successfully");
         }
     }
 }

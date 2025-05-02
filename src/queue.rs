@@ -81,4 +81,9 @@ impl WaffleQueue {
 
         drained
     }
+
+    pub fn list(&self) -> Vec<String> {
+        let mut con = self.redis.get_connection().unwrap();
+        con.lrange(QUEUE_NAME, 0, -1).unwrap_or_else(|_| vec![])
+    }
 }
