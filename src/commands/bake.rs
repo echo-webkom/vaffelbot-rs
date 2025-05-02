@@ -42,7 +42,7 @@ impl BakeCommand {
             }
         }
 
-        let message = if baked.len() == 0 {
+        let message = if baked.is_empty() {
             "Ingen vafler å steke".to_string()
         } else {
             let mut msg = MessageBuilder::new();

@@ -51,7 +51,7 @@ impl WaffleBot {
     }
 
     pub async fn start(self) -> Result<(), serenity::Error> {
-        let mut client = Client::builder(&self.token.clone(), GatewayIntents::empty())
+        let mut client = Client::builder(self.token.clone(), GatewayIntents::empty())
             .event_handler(self)
             .await?;
 

@@ -1,0 +1,26 @@
+name: 🧪 Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-vertex:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🔍 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🧪 Run tests
+        run: cargo test -- --test-threads=1
+
+      - name: ✅ Clippy
+        run: cargo clippy --all-features -- -D warnings
+
+      - name: 📦 Build
+        run: cargo build --all-features --release

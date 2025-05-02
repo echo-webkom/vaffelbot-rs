@@ -51,10 +51,7 @@ impl WaffleQueue {
     pub fn push(&self, value: String) -> usize {
         let mut con = self.redis.get_connection().unwrap();
 
-        match con.rpush(QUEUE_NAME, value) {
-            Ok(len) => len,
-            Err(_) => 0,
-        }
+        con.rpush(QUEUE_NAME, value).unwrap_or_default()
     }
 
     pub fn pop(&self) -> Option<String> {
