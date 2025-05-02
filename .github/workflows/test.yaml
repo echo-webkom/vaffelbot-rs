@@ -20,7 +20,7 @@ jobs:
         run: cargo test -- --test-threads=1
 
       - name: ✅ Clippy
-        run: cargo clippy --all-features -- -D warnings
+        run: cargo clippy -- -D warnings
 
       - name: 📦 Build
-        run: cargo build --all-features --release
+        run: cargo build --release
