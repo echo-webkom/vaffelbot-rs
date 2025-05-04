@@ -1,15 +1,35 @@
-use serenity::all::{CreateCommand, CreateInteractionResponse};
+use serenity::{
+    all::{CommandInteraction, CreateInteractionResponse},
+    async_trait,
+};
 
-use super::create_ephemeral_response;
+use crate::bot::WaffleContext;
+
+use super::{create_ephemeral_response, CommandHandler};
 
 pub struct PingCommand;
 
 impl PingCommand {
-    pub fn run() -> CreateInteractionResponse {
-        create_ephemeral_response("Pong!")
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+#[async_trait]
+impl CommandHandler for PingCommand {
+    fn name(&self) -> &'static str {
+        "ping"
     }
 
-    pub fn register() -> CreateCommand {
-        CreateCommand::new("ping").description("Ping Vaffelbotten")
+    fn description(&self) -> &'static str {
+        "Ping botten for å se om den er online"
+    }
+
+    fn execute(
+        &self,
+        _ctx: &WaffleContext,
+        _interaction: &CommandInteraction,
+    ) -> CreateInteractionResponse {
+        create_ephemeral_response("Pong!")
     }
 }

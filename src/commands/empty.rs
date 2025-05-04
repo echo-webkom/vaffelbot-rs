@@ -1,21 +1,37 @@
-use std::sync::Arc;
+use serenity::all::{CommandInteraction, CreateInteractionResponse, MessageBuilder, UserId};
 
-use serenity::all::{CreateCommand, CreateInteractionResponse, MessageBuilder, UserId};
+use crate::bot::WaffleContext;
 
-use crate::queue::WaffleQueue;
-
-use super::{create_ephemeral_response, create_response};
+use super::{create_ephemeral_response, create_response, CommandHandler};
 
 pub struct EmptyCommand;
 
 impl EmptyCommand {
-    pub fn run(bot: Arc<WaffleQueue>, is_oracle: bool) -> CreateInteractionResponse {
-        if !is_oracle {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl CommandHandler for EmptyCommand {
+    fn name(&self) -> &'static str {
+        "tøm"
+    }
+
+    fn description(&self) -> &'static str {
+        "Tøm køen"
+    }
+
+    fn execute(
+        &self,
+        ctx: &WaffleContext,
+        _interation: &CommandInteraction,
+    ) -> CreateInteractionResponse {
+        if !ctx.is_oracle {
             return create_ephemeral_response("Kun orakler kan tømme køen");
         }
 
-        let users = bot.drain();
-        bot.close();
+        let users = ctx.queue.drain();
+        ctx.queue.close();
 
         if users.is_empty() {
             return create_response("Køen er allerede tom");
@@ -42,9 +58,5 @@ impl EmptyCommand {
         let message = msg.build();
 
         create_response(&message)
-    }
-
-    pub fn register() -> CreateCommand {
-        CreateCommand::new("tøm").description("Tøm køen")
     }
 }

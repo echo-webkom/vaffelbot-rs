@@ -1,29 +1,43 @@
-use std::sync::Arc;
-
 use serenity::all::{
-    CommandOptionType, CreateCommand, CreateCommandOption, CreateInteractionResponse,
-    MessageBuilder, UserId,
+    CommandInteraction, CommandOptionType, CreateCommand, CreateCommandOption,
+    CreateInteractionResponse, MessageBuilder, UserId,
 };
 
-use crate::queue::WaffleQueue;
+use crate::bot::WaffleContext;
 
-use super::{create_ephemeral_response, create_response};
+use super::{create_ephemeral_response, create_response, CommandHandler};
 
 pub struct BakeCommand;
 
 impl BakeCommand {
-    pub fn run(
-        queue: Arc<WaffleQueue>,
-        amount: Option<i64>,
-        is_oracle: bool,
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl CommandHandler for BakeCommand {
+    fn name(&self) -> &'static str {
+        "stekt"
+    }
+
+    fn description(&self) -> &'static str {
+        "Stek vaffel"
+    }
+
+    fn execute(
+        &self,
+        ctx: &WaffleContext,
+        interaction: &CommandInteraction,
     ) -> CreateInteractionResponse {
-        if !queue.is_open() {
+        if !ctx.queue.is_open() {
             return create_ephemeral_response("Bestilling er stengt");
         }
 
-        if !is_oracle {
+        if !ctx.is_oracle {
             return create_ephemeral_response("Kun orakler kan steke vafler");
         }
+
+        let amount = interaction.data.options.first().unwrap().value.as_i64();
 
         if amount.is_none() {
             return create_ephemeral_response("Du må spesifisere hvor mange vafler du vil steke");
@@ -32,10 +46,10 @@ impl BakeCommand {
         let amount = amount.unwrap_or(1) as usize;
 
         let mut baked = vec![];
-        let n = queue.size().min(amount);
+        let n = ctx.queue.size().min(amount);
 
         for _ in 0..n {
-            if let Some(user_id) = queue.pop() {
+            if let Some(user_id) = ctx.queue.pop() {
                 baked.push(user_id);
             } else {
                 break;
@@ -76,9 +90,9 @@ impl BakeCommand {
         create_response(&message)
     }
 
-    pub fn register() -> CreateCommand {
-        CreateCommand::new("stekt")
-            .description("Stek vaffel")
+    fn register(&self) -> CreateCommand {
+        CreateCommand::new(self.name())
+            .description(self.description())
             .add_option(
                 CreateCommandOption::new(
                     CommandOptionType::Integer,

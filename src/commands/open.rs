@@ -1,29 +1,46 @@
-use std::sync::Arc;
+use serenity::all::{ActivityData, CommandInteraction, CreateInteractionResponse, OnlineStatus};
 
-use serenity::all::{CreateCommand, CreateInteractionResponse};
+use crate::bot::WaffleContext;
 
-use crate::queue::WaffleQueue;
-
-use super::{create_ephemeral_response, create_response};
+use super::{create_ephemeral_response, create_response, CommandHandler};
 
 pub struct OpenCommand;
 
 impl OpenCommand {
-    pub fn run(bot: Arc<WaffleQueue>, is_oracle: bool) -> CreateInteractionResponse {
-        if !is_oracle {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl CommandHandler for OpenCommand {
+    fn name(&self) -> &'static str {
+        "start"
+    }
+
+    fn description(&self) -> &'static str {
+        "Åpne for bestilling av vafler"
+    }
+
+    fn execute(
+        &self,
+        ctx: &WaffleContext,
+        _interaction: &CommandInteraction,
+    ) -> CreateInteractionResponse {
+        if !ctx.is_oracle {
             return create_ephemeral_response("Kun orakler kan åpne for bestilling");
         }
 
-        if bot.is_open() {
+        if ctx.queue.is_open() {
             return create_ephemeral_response("Bestilling er allerede åpnet");
         }
 
-        bot.open();
+        ctx.queue.open();
+
+        ctx.context.set_presence(
+            Some(ActivityData::playing("🧇 Lager vafler")),
+            OnlineStatus::Online,
+        );
 
         create_response("Bestilling er nå åpnet")
-    }
-
-    pub fn register() -> CreateCommand {
-        CreateCommand::new("start").description("Åpne for bestilling av vafler")
     }
 }

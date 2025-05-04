@@ -15,22 +15,42 @@ use crate::commands::open::OpenCommand;
 use crate::commands::ping::PingCommand;
 use crate::commands::queue_size::QueueSizeCommand;
 use crate::commands::waffle::WaffleCommand;
+use crate::commands::CommandHandler;
 use crate::queue::WaffleQueue;
+
+pub struct WaffleContext<'a> {
+    pub is_oracle: bool,
+    pub queue: Arc<WaffleQueue>,
+    #[allow(dead_code)]
+    pub context: &'a Context,
+}
 
 pub struct WaffleBot {
     token: String,
     guild_id: GuildId,
     queue: Arc<WaffleQueue>,
+    commands: Vec<Box<(dyn CommandHandler + 'static)>>,
 }
 
 impl WaffleBot {
     pub fn new(token: String, guild_id: u64, queue: Arc<WaffleQueue>) -> Self {
         let guild_id = GuildId::new(guild_id);
 
+        let commands: Vec<Box<dyn CommandHandler>> = vec![
+            Box::new(PingCommand::new()),
+            Box::new(OpenCommand::new()),
+            Box::new(QueueSizeCommand::new()),
+            Box::new(WaffleCommand::new()),
+            Box::new(BakeCommand::new()),
+            Box::new(CloseCommand::new()),
+            Box::new(EmptyCommand::new()),
+        ];
+
         Self {
             token,
             guild_id,
             queue,
+            commands,
         }
     }
 
@@ -63,25 +83,21 @@ impl WaffleBot {
 impl EventHandler for WaffleBot {
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::Command(command) = interaction {
-            let user_id = command.user.id.to_string();
-            let is_oracle = self.is_user_oracle(&ctx, command.user.id).await;
+            let cmd = self
+                .commands
+                .iter()
+                .find(|cmd| cmd.name() == command.data.name);
 
-            let content = match command.data.name.as_str() {
-                "ping" => Some(PingCommand::run()),
-                "kø" => Some(QueueSizeCommand::run(self.queue.clone(), user_id)),
-                "vaffel" => Some(WaffleCommand::run(self.queue.clone(), user_id)),
-                "stekt" => Some(BakeCommand::run(
-                    self.queue.clone(),
-                    command.data.options[0].value.as_i64(),
+            if let Some(cmd) = cmd {
+                let is_oracle = self.is_user_oracle(&ctx, command.user.id).await;
+                let c = WaffleContext {
                     is_oracle,
-                )),
-                "start" => Some(OpenCommand::run(self.queue.clone(), is_oracle)),
-                "stopp" => Some(CloseCommand::run(self.queue.clone(), is_oracle)),
-                "tøm" => Some(EmptyCommand::run(self.queue.clone(), is_oracle)),
-                _ => None,
-            };
+                    queue: self.queue.clone(),
+                    context: &ctx,
+                };
 
-            if let Some(content) = content {
+                let content = cmd.execute(&c, &command);
+
                 if let Err(why) = command.create_response(&ctx.http, content).await {
                     debug!("Cannot respond to slash command: {why}");
                 }
@@ -96,15 +112,7 @@ impl EventHandler for WaffleBot {
             .guild_id
             .set_commands(
                 &ctx.http,
-                vec![
-                    PingCommand::register(),
-                    QueueSizeCommand::register(),
-                    WaffleCommand::register(),
-                    BakeCommand::register(),
-                    OpenCommand::register(),
-                    CloseCommand::register(),
-                    EmptyCommand::register(),
-                ],
+                self.commands.iter().map(|cmd| cmd.register()).collect(),
             )
             .await;
 

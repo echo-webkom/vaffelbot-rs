@@ -1,34 +1,48 @@
-use std::sync::Arc;
+use serenity::all::{CommandInteraction, CreateInteractionResponse};
 
-use serenity::all::{CreateCommand, CreateInteractionResponse};
+use crate::bot::WaffleContext;
 
-use crate::queue::WaffleQueue;
-
-use super::{create_ephemeral_response, create_response};
+use super::{create_ephemeral_response, create_response, CommandHandler};
 
 pub struct WaffleCommand;
 
 impl WaffleCommand {
-    pub fn run(queue: Arc<WaffleQueue>, user_id: String) -> CreateInteractionResponse {
-        if !queue.is_open() {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl CommandHandler for WaffleCommand {
+    fn name(&self) -> &'static str {
+        "vaffel"
+    }
+
+    fn description(&self) -> &'static str {
+        "Få en orakel til å steke vaffel til deg"
+    }
+
+    fn execute(
+        &self,
+        ctx: &WaffleContext,
+        interaction: &CommandInteraction,
+    ) -> CreateInteractionResponse {
+        if !ctx.queue.is_open() {
             return create_ephemeral_response("Bestilling er stengt");
         }
 
-        let message = match queue.index_of(user_id.clone()) {
+        let user_id = interaction.user.id.to_string();
+
+        let message = match ctx.queue.index_of(user_id.clone()) {
             Some(index) => {
                 format!("Du er {} i køen", index + 1)
             }
             None => {
-                let size = queue.size();
-                queue.push(user_id);
+                let size = ctx.queue.size();
+                ctx.queue.push(user_id);
                 format!("Du er nå i køen. Det er {} personer foran deg", size)
             }
         };
 
         create_response(&message)
-    }
-
-    pub fn register() -> CreateCommand {
-        CreateCommand::new("vaffel").description("Få en orakel til å steke vaffel til deg")
     }
 }
