@@ -36,7 +36,7 @@ impl CommandHandler for CloseCommand {
 
         ctx.queue.close();
 
-        ctx.context.set_presence(None, OnlineStatus::DoNotDisturb);
+        ctx.context.set_presence(None, OnlineStatus::Idle);
 
         create_response("Bestilling er nå stengt")
     }
