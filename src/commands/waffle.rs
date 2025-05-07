@@ -1,48 +1,25 @@
-use serenity::all::{CommandInteraction, CreateInteractionResponse};
+use crate::bot::{Context, Error};
 
-use crate::bot::WaffleContext;
-
-use super::{create_ephemeral_response, create_response, CommandHandler};
-
-pub struct WaffleCommand;
-
-impl WaffleCommand {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl CommandHandler for WaffleCommand {
-    fn name(&self) -> &'static str {
-        "vaffel"
+/// Få en orakel til å steke vaffel til deg
+#[poise::command(prefix_command, slash_command, rename = "vaffel")]
+#[tracing::instrument(name = "waffle", skip(ctx))]
+pub async fn waffle(ctx: Context<'_>) -> Result<(), Error> {
+    if !ctx.data().queue.is_open() {
+        ctx.say("Bestilling er stengt").await?;
+        return Ok(());
     }
 
-    fn description(&self) -> &'static str {
-        "Få en orakel til å steke vaffel til deg"
-    }
-
-    fn execute(
-        &self,
-        ctx: &WaffleContext,
-        interaction: &CommandInteraction,
-    ) -> CreateInteractionResponse {
-        if !ctx.queue.is_open() {
-            return create_ephemeral_response("Bestilling er stengt");
+    let user_id = ctx.author().id.to_string();
+    let message = match ctx.data().queue.index_of(user_id.clone()) {
+        Some(index) => format!("Du er {} i køen", index + 1),
+        None => {
+            let size = ctx.data().queue.size();
+            ctx.data().queue.push(user_id);
+            format!("Du er nå i køen. Det er {} personer foran deg", size)
         }
+    };
 
-        let user_id = interaction.user.id.to_string();
+    ctx.say(message).await?;
 
-        let message = match ctx.queue.index_of(user_id.clone()) {
-            Some(index) => {
-                format!("Du er {} i køen", index + 1)
-            }
-            None => {
-                let size = ctx.queue.size();
-                ctx.queue.push(user_id);
-                format!("Du er nå i køen. Det er {} personer foran deg", size)
-            }
-        };
-
-        create_response(&message)
-    }
+    Ok(())
 }

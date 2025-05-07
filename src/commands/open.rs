@@ -1,46 +1,27 @@
-use serenity::all::{ActivityData, CommandInteraction, CreateInteractionResponse, OnlineStatus};
+use serenity::all::{ActivityData, OnlineStatus};
 
-use crate::bot::WaffleContext;
+use crate::bot::{check_is_oracle, Context, Error};
 
-use super::{create_ephemeral_response, create_response, CommandHandler};
-
-pub struct OpenCommand;
-
-impl OpenCommand {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl CommandHandler for OpenCommand {
-    fn name(&self) -> &'static str {
-        "start"
-    }
-
-    fn description(&self) -> &'static str {
-        "Åpne for bestilling av vafler"
+/// Åpne for bestilling av vafler
+#[poise::command(
+    prefix_command,
+    slash_command,
+    rename = "start",
+    check = "check_is_oracle"
+)]
+#[tracing::instrument(name = "open", skip(ctx))]
+pub async fn open(ctx: Context<'_>) -> Result<(), Error> {
+    if ctx.data().queue.is_open() {
+        ctx.say("Bestilling er allerede åpnet").await?;
+        return Ok(());
     }
 
-    fn execute(
-        &self,
-        ctx: &WaffleContext,
-        _interaction: &CommandInteraction,
-    ) -> CreateInteractionResponse {
-        if !ctx.is_oracle {
-            return create_ephemeral_response("Kun orakler kan åpne for bestilling");
-        }
+    ctx.data().queue.open();
 
-        if ctx.queue.is_open() {
-            return create_ephemeral_response("Bestilling er allerede åpnet");
-        }
+    ctx.serenity_context().set_presence(
+        Some(ActivityData::playing("🧇 Lager vafler")),
+        OnlineStatus::Offline,
+    );
 
-        ctx.queue.open();
-
-        ctx.context.set_presence(
-            Some(ActivityData::playing("🧇 Lager vafler")),
-            OnlineStatus::Online,
-        );
-
-        create_response("Bestilling er nå åpnet")
-    }
+    Ok(())
 }

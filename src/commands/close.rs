@@ -1,43 +1,25 @@
-use serenity::all::{CommandInteraction, CreateInteractionResponse, OnlineStatus};
+use serenity::all::OnlineStatus;
 
-use crate::bot::WaffleContext;
+use crate::bot::{check_is_oracle, Context, Error};
 
-use super::{create_ephemeral_response, create_response, CommandHandler};
-
-pub struct CloseCommand;
-
-impl CloseCommand {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl CommandHandler for CloseCommand {
-    fn name(&self) -> &'static str {
-        "stopp"
-    }
-
-    fn description(&self) -> &'static str {
-        "Steng for bestilling av vafler"
+/// Steng for bestilling av vafler
+#[poise::command(
+    prefix_command,
+    slash_command,
+    rename = "stopp",
+    check = "check_is_oracle"
+)]
+#[tracing::instrument(name = "close", skip(ctx))]
+pub async fn close(ctx: Context<'_>) -> Result<(), Error> {
+    if !ctx.data().queue.is_open() {
+        ctx.say("Bestilling er allerede stengt").await?;
+        return Ok(());
     }
 
-    fn execute(
-        &self,
-        ctx: &WaffleContext,
-        _interaction: &CommandInteraction,
-    ) -> CreateInteractionResponse {
-        if !ctx.is_oracle {
-            return create_ephemeral_response("Kun orakler kan stenge for bestilling");
-        }
+    ctx.data().queue.close();
 
-        if !ctx.queue.is_open() {
-            return create_ephemeral_response("Bestilling er allerede stengt");
-        }
+    ctx.serenity_context()
+        .set_presence(None, OnlineStatus::Offline);
 
-        ctx.queue.close();
-
-        ctx.context.set_presence(None, OnlineStatus::Idle);
-
-        create_response("Bestilling er nå stengt")
-    }
+    Ok(())
 }
