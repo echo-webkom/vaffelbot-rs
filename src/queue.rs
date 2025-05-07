@@ -60,21 +60,6 @@ impl WaffleQueue {
         result.ok().and_then(|mut vec| vec.pop())
     }
 
-    pub fn drain(&self) -> Vec<String> {
-        let mut con = self.redis.get_connection().unwrap();
-        let mut drained = Vec::new();
-
-        loop {
-            let item = con.lpop(QUEUE_NAME, None);
-            match item {
-                Ok(val) => drained.push(val),
-                Err(_) => break,
-            }
-        }
-
-        drained
-    }
-
     pub fn list(&self) -> Vec<String> {
         let mut con = self.redis.get_connection().unwrap();
         con.lrange(QUEUE_NAME, 0, -1).unwrap_or_else(|_| vec![])
@@ -109,23 +94,6 @@ mod tests {
 
         let remaining = queue.list();
         assert_eq!(remaining, vec!["bar".to_string()]);
-    }
-
-    #[test]
-    fn test_drain() {
-        let node = Redis::default().start().unwrap();
-        let host_ip = node.get_host().unwrap();
-        let host_port = node.get_host_port_ipv4(6379).unwrap();
-        let url = format!("redis://{host_ip}:{host_port}");
-        let client = redis::Client::open(url).unwrap();
-        let queue = WaffleQueue::new(client);
-
-        queue.push("foo".to_string());
-        queue.push("bar".to_string());
-
-        let drained = queue.drain();
-        assert_eq!(drained, vec!["foo".to_string(), "bar".to_string()]);
-        assert_eq!(queue.size(), 0);
     }
 
     #[test]
