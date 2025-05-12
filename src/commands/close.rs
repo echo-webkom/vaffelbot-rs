@@ -12,11 +12,12 @@ use crate::bot::{check_is_oracle, Context, Error};
 #[tracing::instrument(name = "close", skip(ctx))]
 pub async fn close(ctx: Context<'_>) -> Result<(), Error> {
     if !ctx.data().queue.is_open() {
-        ctx.say("Bestilling er allerede stengt").await?;
+        ctx.say("🔒️ Bestilling er allerede stengt").await?;
         return Ok(());
     }
 
     ctx.data().queue.close();
+    ctx.say("🔒️ Bestilling er nå stengt").await?;
 
     ctx.serenity_context()
         .set_presence(None, OnlineStatus::Offline);
