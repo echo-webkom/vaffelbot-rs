@@ -7,7 +7,7 @@ use crate::bot::{check_is_oracle, Context, Error};
 #[poise::command(
     prefix_command,
     slash_command,
-    rename = "stek",
+    rename = "stekt",
     check = "check_is_oracle"
 )]
 #[tracing::instrument(name = "bake", skip(ctx))]
