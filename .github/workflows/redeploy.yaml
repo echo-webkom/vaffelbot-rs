@@ -1,0 +1,20 @@
+name: 🚀 Redeploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  redeploy:
+    runs-on: ubuntu-latest
+    container: ghcr.io/railwayapp/cli:latest
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_PROJECT_SECRET }}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Deploy to Railway
+        run: |
+          railway redeploy --service ${{ secrets.RAILWAY_SERVICE_ID }} --yes
