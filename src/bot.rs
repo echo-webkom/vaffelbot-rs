@@ -52,15 +52,17 @@ impl WaffleBot {
             .options(options)
             .build();
 
-        let mut client = serenity::Client::builder(self.token.clone(), GatewayIntents::empty())
-            .framework(framework)
-            .await?;
+        let mut client = serenity::Client::builder(
+            self.token.clone(),
+            GatewayIntents::GUILD_MESSAGES | GatewayIntents::MESSAGE_CONTENT,
+        )
+        .framework(framework)
+        .await?;
 
         client.start().await
     }
 }
 
-#[allow(unused)]
 pub async fn check_is_oracle(ctx: Context<'_>) -> Result<bool, Error> {
     if let Ok(member) = ctx.guild_id().unwrap().member(ctx, ctx.author().id).await {
         if let Some(guild_id) = ctx.guild_id() {
