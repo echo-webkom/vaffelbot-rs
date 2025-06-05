@@ -27,7 +27,6 @@ impl WaffleServer {
         });
 
         let app = Router::new()
-            .route("/", get(root))
             .route("/queue", get(list_queue))
             .layer(ServiceBuilder::new().layer(TraceLayer::new_for_http()))
             .with_state(state);
@@ -37,10 +36,6 @@ impl WaffleServer {
 
         axum::serve(listener, app).await
     }
-}
-
-async fn root() -> &'static str {
-    "Hello from Axum!"
 }
 
 async fn list_queue(State(state): State<Arc<AppState>>) -> Json<Vec<String>> {

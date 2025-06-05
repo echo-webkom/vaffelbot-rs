@@ -1,16 +1,19 @@
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc, Mutex,
+};
 
 use redis::Commands;
 
 const QUEUE_NAME: &str = "queue";
 
 pub struct WaffleQueue {
-    redis: redis::Client,
+    redis: Arc<Mutex<redis::Client>>,
     is_open: AtomicBool,
 }
 
 impl WaffleQueue {
-    pub fn new(redis: redis::Client) -> Self {
+    pub fn new(redis: Arc<Mutex<redis::Client>>) -> Self {
         Self {
             redis,
             is_open: AtomicBool::new(false),
@@ -30,7 +33,7 @@ impl WaffleQueue {
     }
 
     pub fn index_of(&self, target: String) -> Option<usize> {
-        let mut con = match self.redis.get_connection() {
+        let mut con = match self.redis.lock().unwrap().get_connection() {
             Ok(c) => c,
             Err(_) => return None,
         };
@@ -44,24 +47,24 @@ impl WaffleQueue {
     }
 
     pub fn size(&self) -> usize {
-        let mut con = self.redis.get_connection().unwrap();
+        let mut con = self.redis.lock().unwrap().get_connection().unwrap();
         con.llen(QUEUE_NAME).unwrap_or(0) as usize
     }
 
     pub fn push(&self, value: String) -> usize {
-        let mut con = self.redis.get_connection().unwrap();
+        let mut con = self.redis.lock().unwrap().get_connection().unwrap();
 
         con.rpush(QUEUE_NAME, value).unwrap_or_default()
     }
 
     pub fn pop(&self) -> Option<String> {
-        let mut con = self.redis.get_connection().unwrap();
+        let mut con = self.redis.lock().unwrap().get_connection().unwrap();
         let result: redis::RedisResult<Vec<String>> = con.lpop(QUEUE_NAME, None);
         result.ok().and_then(|mut vec| vec.pop())
     }
 
     pub fn list(&self) -> Vec<String> {
-        let mut con = self.redis.get_connection().unwrap();
+        let mut con = self.redis.lock().unwrap().get_connection().unwrap();
         con.lrange(QUEUE_NAME, 0, -1).unwrap_or_else(|_| vec![])
     }
 }
@@ -79,7 +82,7 @@ mod tests {
         let host_ip = node.get_host().unwrap();
         let host_port = node.get_host_port_ipv4(6379).unwrap();
         let url = format!("redis://{host_ip}:{host_port}");
-        let client = redis::Client::open(url).unwrap();
+        let client = Arc::new(Mutex::new(redis::Client::open(url).unwrap()));
         let queue = WaffleQueue::new(client);
 
         queue.push("foo".to_string());
@@ -102,7 +105,7 @@ mod tests {
         let host_ip = node.get_host().unwrap();
         let host_port = node.get_host_port_ipv4(6379).unwrap();
         let url = format!("redis://{host_ip}:{host_port}");
-        let client = redis::Client::open(url).unwrap();
+        let client = Arc::new(Mutex::new(redis::Client::open(url).unwrap()));
         let queue = WaffleQueue::new(client);
 
         queue.push("foo".to_string());
@@ -118,7 +121,7 @@ mod tests {
         let host_ip = node.get_host().unwrap();
         let host_port = node.get_host_port_ipv4(6379).unwrap();
         let url = format!("redis://{host_ip}:{host_port}");
-        let client = redis::Client::open(url).unwrap();
+        let client = Arc::new(Mutex::new(redis::Client::open(url).unwrap()));
         let queue = WaffleQueue::new(client);
 
         queue.push("foo".to_string());
@@ -135,7 +138,7 @@ mod tests {
         let host_ip = node.get_host().unwrap();
         let host_port = node.get_host_port_ipv4(6379).unwrap();
         let url = format!("redis://{host_ip}:{host_port}");
-        let client = redis::Client::open(url).unwrap();
+        let client = Arc::new(Mutex::new(redis::Client::open(url).unwrap()));
         let queue = WaffleQueue::new(client);
 
         assert_eq!(queue.size(), 0);
