@@ -3,10 +3,7 @@ mod commands;
 mod queue;
 mod server;
 
-use std::{
-    env,
-    sync::{Arc, Mutex},
-};
+use std::{env, sync::Arc};
 
 use bot::WaffleBot;
 use dotenv::dotenv;
@@ -31,9 +28,7 @@ async fn main() {
     let redis_url = env::var("REDIS_URL").expect("Expected REDIS_URL in environment");
     let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
 
-    let redis = Arc::new(Mutex::new(
-        redis::Client::open(redis_url).expect("Invalid Redis URL"),
-    ));
+    let redis = Arc::new(redis::Client::open(redis_url).expect("Invalid Redis URL"));
     let waffle_queue = Arc::new(WaffleQueue::new(redis));
 
     let waffle_bot = WaffleBot::new(token, waffle_queue.clone());
