@@ -6,6 +6,8 @@ use serenity::all::GatewayIntents;
 
 use crate::{commands, queue::WaffleQueue};
 
+const PREFIX: &str = "$";
+
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
 pub type Context<'a> = poise::Context<'a, Data, Error>;
 
@@ -34,7 +36,7 @@ impl WaffleBot {
                 commands::waffle::waffle(),
             ],
             prefix_options: poise::PrefixFrameworkOptions {
-                prefix: Some("!".into()),
+                prefix: Some(PREFIX.into()),
                 ..Default::default()
             },
             ..Default::default()
