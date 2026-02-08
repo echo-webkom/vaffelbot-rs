@@ -5,19 +5,19 @@ use tracing::info;
 
 use std::{io, sync::Arc};
 
-use crate::queue::WaffleQueue;
+use crate::queue::Queue;
 
 #[derive(Clone)]
 pub struct AppState {
-    queue: Arc<WaffleQueue>,
+    queue: Arc<Queue>,
 }
 
-pub struct WaffleServer {
-    queue: Arc<WaffleQueue>,
+pub struct Server {
+    queue: Arc<Queue>,
 }
 
-impl WaffleServer {
-    pub fn new(queue: Arc<WaffleQueue>) -> Self {
+impl Server {
+    pub fn new(queue: Arc<Queue>) -> Self {
         Self { queue }
     }
 

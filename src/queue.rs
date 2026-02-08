@@ -1,19 +1,17 @@
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
+use std::sync::atomic::{AtomicBool, Ordering};
 
+use r2d2::Pool;
 use redis::Commands;
 
 const QUEUE_NAME: &str = "queue";
 
-pub struct WaffleQueue {
-    redis: Arc<redis::Client>,
+pub struct Queue {
+    redis: Pool<redis::Client>,
     is_open: AtomicBool,
 }
 
-impl WaffleQueue {
-    pub fn new(redis: Arc<redis::Client>) -> Self {
+impl Queue {
+    pub fn new(redis: Pool<redis::Client>) -> Self {
         Self {
             redis,
             is_open: AtomicBool::new(false),
@@ -33,11 +31,7 @@ impl WaffleQueue {
     }
 
     pub fn index_of(&self, target: String) -> Option<usize> {
-        let mut con = match self.redis.get_connection() {
-            Ok(c) => c,
-            Err(_) => return None,
-        };
-
+        let mut con = self.redis.get().ok()?;
         let list: Vec<String> = match con.lrange(QUEUE_NAME, 0, -1) {
             Ok(l) => l,
             Err(_) => return None,
@@ -47,24 +41,23 @@ impl WaffleQueue {
     }
 
     pub fn size(&self) -> usize {
-        let mut con = self.redis.get_connection().unwrap();
+        let mut con = self.redis.get().ok().unwrap();
         con.llen(QUEUE_NAME).unwrap_or(0) as usize
     }
 
     pub fn push(&self, value: String) -> usize {
-        let mut con = self.redis.get_connection().unwrap();
-
+        let mut con = self.redis.get().ok().unwrap();
         con.rpush(QUEUE_NAME, value).unwrap_or_default()
     }
 
     pub fn pop(&self) -> Option<String> {
-        let mut con = self.redis.get_connection().unwrap();
+        let mut con = self.redis.get().ok()?;
         let result: redis::RedisResult<Vec<String>> = con.lpop(QUEUE_NAME, None);
         result.ok().and_then(|mut vec| vec.pop())
     }
 
     pub fn list(&self) -> Vec<String> {
-        let mut con = self.redis.get_connection().unwrap();
+        let mut con = self.redis.get().ok().unwrap();
         con.lrange(QUEUE_NAME, 0, -1).unwrap_or_else(|_| vec![])
     }
 }
@@ -82,8 +75,10 @@ mod tests {
         let host_ip = node.get_host().unwrap();
         let host_port = node.get_host_port_ipv4(6379).unwrap();
         let url = format!("redis://{host_ip}:{host_port}");
-        let client = Arc::new(redis::Client::open(url).unwrap());
-        let queue = WaffleQueue::new(client);
+        let client = Pool::builder()
+            .build(redis::Client::open(url).unwrap())
+            .unwrap();
+        let queue = Queue::new(client);
 
         queue.push("foo".to_string());
         queue.push("bar".to_string());
@@ -105,8 +100,10 @@ mod tests {
         let host_ip = node.get_host().unwrap();
         let host_port = node.get_host_port_ipv4(6379).unwrap();
         let url = format!("redis://{host_ip}:{host_port}");
-        let client = Arc::new(redis::Client::open(url).unwrap());
-        let queue = WaffleQueue::new(client);
+        let client = Pool::builder()
+            .build(redis::Client::open(url).unwrap())
+            .unwrap();
+        let queue = Queue::new(client);
 
         queue.push("foo".to_string());
         queue.push("bar".to_string());
@@ -121,8 +118,10 @@ mod tests {
         let host_ip = node.get_host().unwrap();
         let host_port = node.get_host_port_ipv4(6379).unwrap();
         let url = format!("redis://{host_ip}:{host_port}");
-        let client = Arc::new(redis::Client::open(url).unwrap());
-        let queue = WaffleQueue::new(client);
+        let client = Pool::builder()
+            .build(redis::Client::open(url).unwrap())
+            .unwrap();
+        let queue = Queue::new(client);
 
         queue.push("foo".to_string());
         queue.push("bar".to_string());
@@ -138,8 +137,10 @@ mod tests {
         let host_ip = node.get_host().unwrap();
         let host_port = node.get_host_port_ipv4(6379).unwrap();
         let url = format!("redis://{host_ip}:{host_port}");
-        let client = Arc::new(redis::Client::open(url).unwrap());
-        let queue = WaffleQueue::new(client);
+        let client = Pool::builder()
+            .build(redis::Client::open(url).unwrap())
+            .unwrap();
+        let queue = Queue::new(client);
 
         assert_eq!(queue.size(), 0);
 

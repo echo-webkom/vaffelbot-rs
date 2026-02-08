@@ -4,7 +4,7 @@ use std::sync::Arc;
 use poise::FrameworkOptions;
 use serenity::all::GatewayIntents;
 
-use crate::{commands, queue::WaffleQueue};
+use crate::{commands, queue::Queue};
 
 const PREFIX: &str = "$";
 
@@ -12,16 +12,16 @@ pub type Error = Box<dyn std::error::Error + Send + Sync>;
 pub type Context<'a> = poise::Context<'a, Data, Error>;
 
 pub struct Data {
-    pub queue: Arc<WaffleQueue>,
+    pub queue: Arc<Queue>,
 }
 
-pub struct WaffleBot {
+pub struct Bot {
     token: String,
-    queue: Arc<WaffleQueue>,
+    queue: Arc<Queue>,
 }
 
-impl WaffleBot {
-    pub fn new(token: String, queue: Arc<WaffleQueue>) -> Self {
+impl Bot {
+    pub fn new(token: String, queue: Arc<Queue>) -> Self {
         Self { token, queue }
     }
 
