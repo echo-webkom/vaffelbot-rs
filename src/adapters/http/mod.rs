@@ -5,19 +5,20 @@ use tracing::info;
 
 use std::{io, sync::Arc};
 
-use crate::queue::Queue;
+use crate::domain::QueueRepository;
 
 #[derive(Clone)]
 pub struct AppState {
-    queue: Arc<Queue>,
+    queue: Arc<dyn QueueRepository>,
 }
 
-pub struct Server {
-    queue: Arc<Queue>,
+/// HTTP adapter - primary/driving adapter for REST API access
+pub struct HttpAdapter {
+    queue: Arc<dyn QueueRepository>,
 }
 
-impl Server {
-    pub fn new(queue: Arc<Queue>) -> Self {
+impl HttpAdapter {
+    pub fn new(queue: Arc<dyn QueueRepository>) -> Self {
         Self { queue }
     }
 

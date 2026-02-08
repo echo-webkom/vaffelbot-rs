@@ -1,7 +1,6 @@
 use serenity::all::{ActivityData, OnlineStatus};
-use tracing::debug;
 
-use crate::bot::{check_is_oracle, Context, Error};
+use crate::adapters::discord::{check_is_oracle, Context, Error};
 
 /// Åpne for bestilling av vafler
 #[poise::command(
@@ -12,8 +11,6 @@ use crate::bot::{check_is_oracle, Context, Error};
 )]
 #[tracing::instrument(name = "open", skip(ctx))]
 pub async fn open(ctx: Context<'_>) -> Result<(), Error> {
-    debug!("open command called");
-
     if ctx.data().queue.is_open() {
         ctx.say("🔓️ Bestilling er allerede åpnet").await?;
         return Ok(());

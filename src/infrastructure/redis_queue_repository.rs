@@ -3,34 +3,38 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use r2d2::Pool;
 use redis::Commands;
 
+use crate::domain::QueueRepository;
+
 const QUEUE_NAME: &str = "queue";
 
-pub struct Queue {
+pub struct RedisQueueRepository {
     redis: Pool<redis::Client>,
     is_open: AtomicBool,
 }
 
-impl Queue {
+impl RedisQueueRepository {
     pub fn new(redis: Pool<redis::Client>) -> Self {
         Self {
             redis,
             is_open: AtomicBool::new(false),
         }
     }
+}
 
-    pub fn open(&self) {
+impl QueueRepository for RedisQueueRepository {
+    fn open(&self) {
         self.is_open.store(true, Ordering::Relaxed);
     }
 
-    pub fn close(&self) {
+    fn close(&self) {
         self.is_open.store(false, Ordering::Relaxed);
     }
 
-    pub fn is_open(&self) -> bool {
+    fn is_open(&self) -> bool {
         self.is_open.load(Ordering::Relaxed)
     }
 
-    pub fn index_of(&self, target: String) -> Option<usize> {
+    fn index_of(&self, target: String) -> Option<usize> {
         let mut con = self.redis.get().ok()?;
         let list: Vec<String> = match con.lrange(QUEUE_NAME, 0, -1) {
             Ok(l) => l,
@@ -40,23 +44,23 @@ impl Queue {
         list.iter().position(|item| item == &target)
     }
 
-    pub fn size(&self) -> usize {
+    fn size(&self) -> usize {
         let mut con = self.redis.get().ok().unwrap();
         con.llen(QUEUE_NAME).unwrap_or(0) as usize
     }
 
-    pub fn push(&self, value: String) -> usize {
+    fn push(&self, value: String) -> usize {
         let mut con = self.redis.get().ok().unwrap();
         con.rpush(QUEUE_NAME, value).unwrap_or_default()
     }
 
-    pub fn pop(&self) -> Option<String> {
+    fn pop(&self) -> Option<String> {
         let mut con = self.redis.get().ok()?;
         let result: redis::RedisResult<Vec<String>> = con.lpop(QUEUE_NAME, None);
         result.ok().and_then(|mut vec| vec.pop())
     }
 
-    pub fn list(&self) -> Vec<String> {
+    fn list(&self) -> Vec<String> {
         let mut con = self.redis.get().ok().unwrap();
         con.lrange(QUEUE_NAME, 0, -1).unwrap_or_else(|_| vec![])
     }
@@ -78,7 +82,7 @@ mod tests {
         let client = Pool::builder()
             .build(redis::Client::open(url).unwrap())
             .unwrap();
-        let queue = Queue::new(client);
+        let queue = RedisQueueRepository::new(client);
 
         queue.push("foo".to_string());
         queue.push("bar".to_string());
@@ -103,7 +107,7 @@ mod tests {
         let client = Pool::builder()
             .build(redis::Client::open(url).unwrap())
             .unwrap();
-        let queue = Queue::new(client);
+        let queue = RedisQueueRepository::new(client);
 
         queue.push("foo".to_string());
         queue.push("bar".to_string());
@@ -121,7 +125,7 @@ mod tests {
         let client = Pool::builder()
             .build(redis::Client::open(url).unwrap())
             .unwrap();
-        let queue = Queue::new(client);
+        let queue = RedisQueueRepository::new(client);
 
         queue.push("foo".to_string());
         queue.push("bar".to_string());
@@ -140,7 +144,7 @@ mod tests {
         let client = Pool::builder()
             .build(redis::Client::open(url).unwrap())
             .unwrap();
-        let queue = Queue::new(client);
+        let queue = RedisQueueRepository::new(client);
 
         assert_eq!(queue.size(), 0);
 

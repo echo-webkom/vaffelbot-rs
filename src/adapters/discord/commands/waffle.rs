@@ -1,13 +1,9 @@
-use tracing::debug;
-
-use crate::bot::{Context, Error};
+use crate::adapters::discord::{Context, Error};
 
 /// Få en orakel til å steke vaffel til deg
 #[poise::command(prefix_command, slash_command, rename = "vaffel")]
 #[tracing::instrument(name = "waffle", skip(ctx))]
 pub async fn waffle(ctx: Context<'_>) -> Result<(), Error> {
-    debug!("waffle command called");
-
     if !ctx.data().queue.is_open() {
         ctx.say("🏮 Bestilling er stengt").await?;
         return Ok(());

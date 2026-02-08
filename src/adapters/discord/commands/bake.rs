@@ -1,7 +1,6 @@
 use serenity::all::{MessageBuilder, UserId};
-use tracing::debug;
 
-use crate::bot::{check_is_oracle, Context, Error};
+use crate::adapters::discord::{check_is_oracle, Context, Error};
 
 /// Stek vaffel
 #[poise::command(
@@ -15,8 +14,6 @@ pub async fn bake(
     ctx: Context<'_>,
     #[description = "Hvor mange vafler?"] amount: usize,
 ) -> Result<(), Error> {
-    debug!("bake command called");
-
     if !ctx.data().queue.is_open() {
         ctx.say("🔒️ Bestilling er stengt").await?;
         return Ok(());

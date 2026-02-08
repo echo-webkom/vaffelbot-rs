@@ -1,10 +1,12 @@
+pub mod commands;
+
 use serenity::Error as SerenityError;
 use std::sync::Arc;
 
 use poise::FrameworkOptions;
 use serenity::all::GatewayIntents;
 
-use crate::{commands, queue::Queue};
+use crate::domain::QueueRepository;
 
 const PREFIX: &str = "$";
 
@@ -12,16 +14,17 @@ pub type Error = Box<dyn std::error::Error + Send + Sync>;
 pub type Context<'a> = poise::Context<'a, Data, Error>;
 
 pub struct Data {
-    pub queue: Arc<Queue>,
+    pub queue: Arc<dyn QueueRepository>,
 }
 
-pub struct Bot {
+/// Discord adapter - primary/driving adapter for Discord bot access
+pub struct DiscordAdapter {
     token: String,
-    queue: Arc<Queue>,
+    queue: Arc<dyn QueueRepository>,
 }
 
-impl Bot {
-    pub fn new(token: String, queue: Arc<Queue>) -> Self {
+impl DiscordAdapter {
+    pub fn new(token: String, queue: Arc<dyn QueueRepository>) -> Self {
         Self { token, queue }
     }
 

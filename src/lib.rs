@@ -3,13 +3,16 @@ use std::sync::Arc;
 use r2d2::Pool;
 use tracing::error;
 
-use crate::{bot::Bot, config::Config, queue::Queue, server::Server};
+use crate::{
+    adapters::{DiscordAdapter, HttpAdapter},
+    config::Config,
+    infrastructure::RedisQueueRepository,
+};
 
-pub mod bot;
-mod commands;
+pub mod adapters;
 pub mod config;
-pub mod queue;
-pub mod server;
+pub mod domain;
+pub mod infrastructure;
 
 pub struct VaffelBot {
     config: Config,
@@ -26,19 +29,20 @@ impl VaffelBot {
             .build(redis)
             .expect("Failed to create Redis connection pool");
 
-        let queue = Arc::new(Queue::new(redis_pool));
+        let queue: Arc<dyn domain::QueueRepository> =
+            Arc::new(RedisQueueRepository::new(redis_pool));
 
-        let bot = Bot::new(self.config.discord_token.clone(), queue.clone());
-        let server = Server::new(queue.clone());
+        let discord_adapter = DiscordAdapter::new(self.config.discord_token.clone(), queue.clone());
+        let http_adapter = HttpAdapter::new(queue.clone());
 
         let axum_handle = tokio::spawn(async move {
-            if let Err(why) = server.start().await {
+            if let Err(why) = http_adapter.start().await {
                 error!("HTTP server error: {why:?}");
             }
         });
 
         let bot_handle = tokio::spawn(async move {
-            if let Err(why) = bot.start().await {
+            if let Err(why) = discord_adapter.start().await {
                 error!("Discord bot error: {why:?}");
             }
         });

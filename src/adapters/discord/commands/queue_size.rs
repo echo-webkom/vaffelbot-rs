@@ -1,13 +1,9 @@
-use tracing::debug;
-
-use crate::bot::{Context, Error};
+use crate::adapters::discord::{Context, Error};
 
 /// Se hvor mange som er foran deg i køen
 #[poise::command(prefix_command, slash_command, rename = "kø")]
 #[tracing::instrument(name = "queue", skip(ctx))]
 pub async fn queue(ctx: Context<'_>) -> Result<(), Error> {
-    debug!("queue command called");
-
     if !ctx.data().queue.is_open() {
         ctx.say("🚨 Bestilling er stengt").await?;
         return Ok(());
