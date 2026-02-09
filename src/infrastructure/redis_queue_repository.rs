@@ -27,8 +27,8 @@ impl QueueRepository for RedisQueueRepository {
     }
 
     fn close(&self) {
-        // TODO: Should this also clear the queue?
         self.is_open.store(false, Ordering::Relaxed);
+        self.clear();
     }
 
     fn is_open(&self) -> bool {
@@ -64,6 +64,11 @@ impl QueueRepository for RedisQueueRepository {
     fn list(&self) -> Vec<String> {
         let mut con = self.redis.get().ok().unwrap();
         con.lrange(QUEUE_NAME, 0, -1).unwrap_or_else(|_| vec![])
+    }
+
+    fn clear(&self) {
+        let mut con = self.redis.get().ok().unwrap();
+        con.del::<_, ()>(QUEUE_NAME).ok();
     }
 }
 
@@ -153,5 +158,26 @@ mod tests {
         queue.push("bar".to_string());
 
         assert_eq!(queue.size(), 2);
+    }
+
+    #[test]
+    fn test_clear() {
+        let node = Redis::default().start().unwrap();
+        let host_ip = node.get_host().unwrap();
+        let host_port = node.get_host_port_ipv4(6379).unwrap();
+        let url = format!("redis://{host_ip}:{host_port}");
+        let client = Pool::builder()
+            .build(redis::Client::open(url).unwrap())
+            .unwrap();
+        let queue = RedisQueueRepository::new(client);
+
+        queue.push("foo".to_string());
+        queue.push("bar".to_string());
+
+        assert_eq!(queue.size(), 2);
+
+        queue.clear();
+
+        assert_eq!(queue.size(), 0);
     }
 }

@@ -25,4 +25,7 @@ pub trait QueueRepository: Send + Sync {
 
     /// Get all items in the queue without removing them
     fn list(&self) -> Vec<String>;
+
+    /// Clear all items from the queue
+    fn clear(&self);
 }
