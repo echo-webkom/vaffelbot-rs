@@ -9,12 +9,38 @@ on:
       - main
 
 jobs:
-  build-vertex:
+  test:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: vaffelbot
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/vaffelbot
 
     steps:
       - name: 🔍 Checkout
         uses: actions/checkout@v6
+
+      - name: 🦀 Install SQLX
+        run: cargo install sqlx-cli --no-default-features --features postgres
+
+      - name: 🧪 Prepare database
+        run: |
+          sqlx database setup
+          sqlx migrate run
 
       - name: 🧪 Run tests
         run: cargo test -- --test-threads=1
