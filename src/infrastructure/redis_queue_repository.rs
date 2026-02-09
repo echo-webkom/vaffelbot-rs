@@ -27,6 +27,7 @@ impl QueueRepository for RedisQueueRepository {
     }
 
     fn close(&self) {
+        // TODO: Should this also clear the queue?
         self.is_open.store(false, Ordering::Relaxed);
     }
 

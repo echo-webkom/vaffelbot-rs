@@ -1,4 +1,5 @@
 use serenity::all::{MessageBuilder, UserId};
+use tracing::error;
 
 use crate::adapters::discord::{check_is_oracle, Context, Error};
 
@@ -64,6 +65,12 @@ pub async fn bake(
 
         msg.build()
     };
+
+    for user_id in &baked {
+        if let Err(e) = ctx.data().orders.record_order(user_id).await {
+            error!("Failed to record order for {user_id}: {e}");
+        }
+    }
 
     ctx.say(message).await?;
 

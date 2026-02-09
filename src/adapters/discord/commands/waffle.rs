@@ -11,7 +11,10 @@ pub async fn waffle(ctx: Context<'_>) -> Result<(), Error> {
 
     let user_id = ctx.author().id.to_string();
     let message = match ctx.data().queue.index_of(user_id.clone()) {
-        Some(index) => format!("⏲️ Du er allerede i køden. Det er **{} foran deg**.", index),
+        Some(index) => format!(
+            "⏲️ Du er **allerede** i køen. Det er **{} foran deg**.",
+            index
+        ),
         None => {
             let size = ctx.data().queue.size();
             ctx.data().queue.push(user_id);

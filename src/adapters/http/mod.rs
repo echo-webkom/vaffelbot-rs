@@ -5,26 +5,29 @@ use tracing::info;
 
 use std::{io, sync::Arc};
 
-use crate::domain::QueueRepository;
+use crate::domain::{OrderRepository, QueueRepository};
 
 #[derive(Clone)]
 pub struct AppState {
     queue: Arc<dyn QueueRepository>,
+    #[allow(dead_code)]
+    orders: Arc<dyn OrderRepository>,
 }
 
-/// HTTP adapter - primary/driving adapter for REST API access
 pub struct HttpAdapter {
     queue: Arc<dyn QueueRepository>,
+    orders: Arc<dyn OrderRepository>,
 }
 
 impl HttpAdapter {
-    pub fn new(queue: Arc<dyn QueueRepository>) -> Self {
-        Self { queue }
+    pub fn new(queue: Arc<dyn QueueRepository>, orders: Arc<dyn OrderRepository>) -> Self {
+        Self { queue, orders }
     }
 
     pub async fn start(&self) -> Result<(), io::Error> {
         let state = Arc::new(AppState {
             queue: self.queue.clone(),
+            orders: self.orders.clone(),
         });
 
         let app = Router::new()

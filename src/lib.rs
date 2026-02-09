@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
 use r2d2::Pool;
+use sqlx::postgres::PgPoolOptions;
 use tracing::error;
 
 use crate::{
     adapters::{DiscordAdapter, HttpAdapter},
     config::Config,
-    infrastructure::RedisQueueRepository,
+    infrastructure::{PostgresOrderRepository, RedisQueueRepository},
 };
 
 pub mod adapters;
@@ -29,11 +30,26 @@ impl VaffelBot {
             .build(redis)
             .expect("Failed to create Redis connection pool");
 
+        let pg_pool = PgPoolOptions::new()
+            .max_connections(5)
+            .connect(&self.config.database_url)
+            .await
+            .expect("Failed to connect to PostgreSQL");
+
+        sqlx::migrate!().run(&pg_pool).await?;
+
         let queue: Arc<dyn domain::QueueRepository> =
             Arc::new(RedisQueueRepository::new(redis_pool));
 
-        let discord_adapter = DiscordAdapter::new(self.config.discord_token.clone(), queue.clone());
-        let http_adapter = HttpAdapter::new(queue.clone());
+        let orders: Arc<dyn domain::OrderRepository> =
+            Arc::new(PostgresOrderRepository::new(pg_pool));
+
+        let discord_adapter = DiscordAdapter::new(
+            self.config.discord_token.clone(),
+            queue.clone(),
+            orders.clone(),
+        );
+        let http_adapter = HttpAdapter::new(queue.clone(), orders.clone());
 
         let axum_handle = tokio::spawn(async move {
             if let Err(why) = http_adapter.start().await {

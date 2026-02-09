@@ -6,7 +6,7 @@ use std::sync::Arc;
 use poise::FrameworkOptions;
 use serenity::all::GatewayIntents;
 
-use crate::domain::QueueRepository;
+use crate::domain::{OrderRepository, QueueRepository};
 
 const PREFIX: &str = "$";
 
@@ -15,17 +15,27 @@ pub type Context<'a> = poise::Context<'a, Data, Error>;
 
 pub struct Data {
     pub queue: Arc<dyn QueueRepository>,
+    pub orders: Arc<dyn OrderRepository>,
 }
 
 /// Discord adapter - primary/driving adapter for Discord bot access
 pub struct DiscordAdapter {
     token: String,
     queue: Arc<dyn QueueRepository>,
+    orders: Arc<dyn OrderRepository>,
 }
 
 impl DiscordAdapter {
-    pub fn new(token: String, queue: Arc<dyn QueueRepository>) -> Self {
-        Self { token, queue }
+    pub fn new(
+        token: String,
+        queue: Arc<dyn QueueRepository>,
+        orders: Arc<dyn OrderRepository>,
+    ) -> Self {
+        Self {
+            token,
+            queue,
+            orders,
+        }
     }
 
     pub async fn start(self) -> Result<(), SerenityError> {
@@ -51,6 +61,7 @@ impl DiscordAdapter {
                     poise::builtins::register_globally(ctx, &framework.options().commands).await?;
                     Ok(Data {
                         queue: self.queue.clone(),
+                        orders: self.orders.clone(),
                     })
                 })
             })
