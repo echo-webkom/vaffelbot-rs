@@ -8,7 +8,7 @@ use serenity::all::GatewayIntents;
 
 use crate::domain::{OrderRepository, QueueRepository};
 
-const PREFIX: &str = "$";
+const PREFIX: &str = "!";
 
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
 pub type Context<'a> = poise::Context<'a, Data, Error>;
