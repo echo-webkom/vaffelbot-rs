@@ -18,7 +18,6 @@ pub struct Data {
     pub orders: Arc<dyn OrderRepository>,
 }
 
-/// Discord adapter - primary/driving adapter for Discord bot access
 pub struct DiscordAdapter {
     token: String,
     queue: Arc<dyn QueueRepository>,
@@ -88,11 +87,22 @@ pub async fn check_is_oracle(ctx: Context<'_>) -> Result<bool, Error> {
                     .find(|r| r.name.to_lowercase() == "orakel")
                     .map(|r| r.id)
                 {
-                    return Ok(member.roles.contains(&orakel_role_id));
+                    if member.roles.contains(&orakel_role_id) {
+                        return Ok(true);
+                    }
                 }
             }
         }
     }
 
+    // Send message to discord to prevent timeout.
+    // Dsicord expects a response within 3 seconds. Just
+    // returning false does not respond to the interaction.
+    ctx.send(
+        poise::CreateReply::default()
+            .content("❌ Du har ikke tilgang til denne kommandoen.")
+            .ephemeral(true),
+    )
+    .await?;
     Ok(false)
 }
