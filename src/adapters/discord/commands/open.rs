@@ -21,7 +21,7 @@ pub async fn open(ctx: Context<'_>) -> Result<(), Error> {
 
     ctx.serenity_context().set_presence(
         Some(ActivityData::playing("🧇 Lager vafler")),
-        OnlineStatus::Offline,
+        OnlineStatus::Online,
     );
 
     Ok(())
