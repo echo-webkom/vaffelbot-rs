@@ -11,7 +11,6 @@ Make sure that you have copied `.env.example` to `.env` and filled in the missin
 | Variable        | Description                                                           |
 | --------------- | --------------------------------------------------------------------- |
 | `DISCORD_TOKEN` | The discord token. Used in authenticate requests                      |
-| `GUILD_ID`      | The guild id is the id of the server where the bot is supposed to run |
 | `REDIS_URL`     | The url to the redis (valkey) database                                |
 
 When this is done you can just run the bot with:

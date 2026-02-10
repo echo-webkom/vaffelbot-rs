@@ -27,7 +27,6 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       - DATABASE_URL=postgres://postgres:postgres@postgres:5432/vaffelbot
-      - GUILD_ID=your_guild_id_here
       - DISCORD_TOKEN=your_discord_token_here
     depends_on:
       - redis
