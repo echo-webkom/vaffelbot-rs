@@ -1,4 +1,5 @@
-use serenity::all::OnlineStatus;
+use serenity::all::{Mentionable, OnlineStatus, UserId};
+use tracing::error;
 
 use crate::adapters::discord::{check_is_oracle, Context, Error};
 
@@ -17,7 +18,43 @@ pub async fn close(ctx: Context<'_>) -> Result<(), Error> {
     }
 
     ctx.data().queue.close();
-    ctx.say("🔒️ Bestilling er nå stengt").await?;
+
+    let mut message = "🔒️ Bestilling er nå stengt".to_string();
+
+    match ctx.data().orders.daily_stats().await {
+        Ok(stats) if stats.total_orders > 0 => {
+            let vafler = if stats.total_orders == 1 {
+                "vaffel"
+            } else {
+                "vafler"
+            };
+            message.push_str(&format!(
+                "\n\n📊 **Dagens statistikk**\nTotalt stekt: {} {}\n",
+                stats.total_orders, vafler
+            ));
+
+            if !stats.top_users.is_empty() {
+                message.push_str("\n🏆 **Topp bestillere:**\n");
+                let medals = ["🥇", "🥈", "🥉"];
+                for (i, (user_id, count)) in stats.top_users.iter().enumerate() {
+                    if let Ok(id) = user_id.parse::<u64>() {
+                        let mention = UserId::new(id).mention();
+                        let vafler = if *count == 1 { "vaffel" } else { "vafler" };
+                        message.push_str(&format!(
+                            "{} {} - {} {}\n",
+                            medals[i], mention, count, vafler
+                        ));
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            error!("Failed to fetch daily stats: {e}");
+        }
+        _ => {}
+    }
+
+    ctx.say(message).await?;
 
     ctx.serenity_context()
         .set_presence(None, OnlineStatus::Offline);

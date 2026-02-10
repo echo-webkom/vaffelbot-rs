@@ -1,5 +1,5 @@
 pub mod order;
 pub mod queue;
 
-pub use order::OrderRepository;
+pub use order::{DailyStats, OrderRepository};
 pub use queue::QueueRepository;

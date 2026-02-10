@@ -1,6 +1,6 @@
 use sqlx::PgPool;
 
-use crate::domain::OrderRepository;
+use crate::domain::{DailyStats, OrderRepository};
 
 pub struct PostgresOrderRepository {
     pool: PgPool,
@@ -22,5 +22,32 @@ impl OrderRepository for PostgresOrderRepository {
         .execute(&self.pool)
         .await?;
         Ok(())
+    }
+
+    async fn daily_stats(&self) -> anyhow::Result<DailyStats> {
+        let total = sqlx::query_scalar!(
+            "SELECT COUNT(*) FROM orders WHERE fulfilled_at::date = CURRENT_DATE"
+        )
+        .fetch_one(&self.pool)
+        .await?
+        .unwrap_or(0);
+
+        let top_users = sqlx::query!(
+            "SELECT discord_user_id, COUNT(*) as count FROM orders \
+             WHERE fulfilled_at::date = CURRENT_DATE \
+             GROUP BY discord_user_id \
+             ORDER BY count DESC \
+             LIMIT 3"
+        )
+        .fetch_all(&self.pool)
+        .await?
+        .into_iter()
+        .map(|row| (row.discord_user_id, row.count.unwrap_or(0)))
+        .collect();
+
+        Ok(DailyStats {
+            total_orders: total,
+            top_users,
+        })
     }
 }
