@@ -60,7 +60,8 @@ pub async fn bake(
         }
 
         if amount > n {
-            msg.push(format!(" ({} vafler til overs)", amount - n));
+            let vafler = if amount - n == 1 { "vaffel" } else { "vafler" };
+            msg.push(format!(" ({} {} til overs)", amount - n, vafler));
         }
 
         msg.build()
