@@ -22,8 +22,7 @@ pub async fn bake(
         return Ok(());
     }
 
-    let n = ctx.data().queue.size(&guild_id).await.min(amount);
-    let baked = ctx.data().queue.pop_n(&guild_id, n).await;
+    let baked = ctx.data().queue.pop_n(&guild_id, amount).await;
 
     let message = if baked.is_empty() {
         "😟 Ingen å steke vafler til.".to_string()
