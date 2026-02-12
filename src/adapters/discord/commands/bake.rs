@@ -32,10 +32,7 @@ pub async fn bake(
     }
 
     let message = if baked.is_empty() {
-        let mut s = "😟 Ingen å steke vafler til.".to_string();
-        if amount > n {
-            s.push_str(format!(" ({} vafler til overs)", amount - n).as_str());
-        }
+        let s = "😟 Ingen å steke vafler til.".to_string();
         s
     } else {
         let mut msg = MessageBuilder::new();
@@ -57,11 +54,6 @@ pub async fn bake(
                     msg.mention(&user_id).push(", ");
                 }
             }
-        }
-
-        if amount > n {
-            let vafler = if amount - n == 1 { "vaffel" } else { "vafler" };
-            msg.push(format!(" ({} {} til overs)", amount - n, vafler));
         }
 
         msg.build()
