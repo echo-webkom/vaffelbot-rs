@@ -1,8 +1,8 @@
 use crate::adapters::discord::{Context, Error};
 
 /// Se hvor mange som er foran deg i køen
-#[poise::command(prefix_command, slash_command, rename = "kø")]
 #[tracing::instrument(name = "queue", skip(ctx))]
+#[poise::command(prefix_command, slash_command, rename = "kø")]
 pub async fn queue(ctx: Context<'_>) -> Result<(), Error> {
     let guild_id = ctx.guild_id().unwrap().to_string();
 

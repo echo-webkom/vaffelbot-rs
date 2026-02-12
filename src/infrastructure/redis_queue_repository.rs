@@ -1,6 +1,7 @@
 use std::{collections::HashSet, sync::RwLock};
 
 use redis::AsyncCommands;
+use tracing::{debug, error, info, instrument, warn};
 
 use crate::domain::{QueueEntry, QueueRepository};
 
@@ -24,80 +25,156 @@ impl RedisQueueRepository {
 
 #[async_trait::async_trait]
 impl QueueRepository for RedisQueueRepository {
+    #[instrument(skip(self), fields(guild_id))]
     fn open(&self, guild_id: &str) {
+        info!(guild_id, "Opening queue for guild");
         self.open_guilds
             .write()
             .unwrap()
             .insert(guild_id.to_string());
     }
 
+    #[instrument(skip(self), fields(guild_id))]
     async fn close(&self, guild_id: &str) {
+        info!(guild_id, "Closing queue for guild");
         self.open_guilds.write().unwrap().remove(guild_id);
         self.clear(guild_id).await;
     }
 
+    #[instrument(skip(self), fields(guild_id))]
     fn is_open(&self, guild_id: &str) -> bool {
-        self.open_guilds.read().unwrap().contains(guild_id)
+        let is_open = self.open_guilds.read().unwrap().contains(guild_id);
+        debug!(guild_id, is_open, "Checking if queue is open");
+        is_open
     }
 
+    #[instrument(skip(self), fields(guild_id, user_id))]
     async fn index_of(&self, guild_id: &str, user_id: &str) -> Option<usize> {
         let key = queue_key(guild_id);
-        let mut con = self.redis.get_multiplexed_async_connection().await.ok()?;
-        let list: Vec<String> = con.lrange(&key, 0, -1).await.ok()?;
+        let mut con = match self.redis.get_multiplexed_async_connection().await {
+            Ok(con) => con,
+            Err(e) => {
+                error!(guild_id, user_id, error = ?e, "Failed to get Redis connection for index_of");
+                return None;
+            }
+        };
 
-        list.iter().position(|json_str| {
+        let list: Vec<String> = match con.lrange(&key, 0, -1).await {
+            Ok(list) => list,
+            Err(e) => {
+                error!(guild_id, user_id, error = ?e, "Failed to fetch queue list from Redis");
+                return None;
+            }
+        };
+
+        let position = list.iter().position(|json_str| {
             serde_json::from_str::<QueueEntry>(json_str)
                 .map(|entry| entry.user_id == user_id)
                 .unwrap_or(false)
-        })
+        });
+
+        debug!(guild_id, user_id, position = ?position, "Found user position in queue");
+        position
     }
 
+    #[instrument(skip(self), fields(guild_id))]
     async fn size(&self, guild_id: &str) -> usize {
         let key = queue_key(guild_id);
         let mut con = match self.redis.get_multiplexed_async_connection().await {
             Ok(con) => con,
-            Err(_) => return 0,
+            Err(e) => {
+                error!(guild_id, error = ?e, "Failed to get Redis connection for size");
+                return 0;
+            }
         };
-        con.llen(&key).await.unwrap_or(0)
+        let size = con.llen(&key).await.unwrap_or_else(|e| {
+            error!(guild_id, error = ?e, "Failed to get queue size from Redis");
+            0
+        });
+        debug!(guild_id, size, "Retrieved queue size");
+        size
     }
 
+    #[instrument(skip(self, entry), fields(guild_id, user_id = %entry.user_id))]
     async fn push(&self, guild_id: &str, entry: QueueEntry) -> usize {
         let key = queue_key(guild_id);
         let json = serde_json::to_string(&entry).unwrap();
         let mut con = match self.redis.get_multiplexed_async_connection().await {
             Ok(con) => con,
-            Err(_) => return 0,
+            Err(e) => {
+                error!(guild_id, user_id = %entry.user_id, error = ?e, "Failed to get Redis connection for push");
+                return 0;
+            }
         };
-        con.rpush(&key, json).await.unwrap_or_default()
+        let new_size = con.rpush(&key, json).await.unwrap_or_else(|e| {
+            error!(guild_id, user_id = %entry.user_id, error = ?e, "Failed to push to queue in Redis");
+            0
+        });
+        info!(guild_id, user_id = %entry.user_id, queue_size = new_size, "Added user to queue");
+        new_size
     }
 
+    #[instrument(skip(self), fields(guild_id))]
     async fn pop(&self, guild_id: &str) -> Option<QueueEntry> {
         let key = queue_key(guild_id);
-        let mut con = self.redis.get_multiplexed_async_connection().await.ok()?;
+        let mut con = match self.redis.get_multiplexed_async_connection().await {
+            Ok(con) => con,
+            Err(e) => {
+                error!(guild_id, error = ?e, "Failed to get Redis connection for pop");
+                return None;
+            }
+        };
         let result: redis::RedisResult<Vec<String>> = con.lpop(&key, None).await;
-        result
+        let entry: Option<QueueEntry> = result
             .ok()
             .and_then(|mut vec| vec.pop())
-            .and_then(|json_str| serde_json::from_str(&json_str).ok())
+            .and_then(|json_str| serde_json::from_str(&json_str).ok());
+
+        match &entry {
+            Some(e) => info!(guild_id, user_id = %e.user_id, "Popped user from queue"),
+            None => debug!(guild_id, "No entry to pop from queue"),
+        }
+        entry
     }
 
+    #[instrument(skip(self), fields(guild_id))]
     async fn list(&self, guild_id: &str) -> Vec<QueueEntry> {
         let key = queue_key(guild_id);
         let mut con = match self.redis.get_multiplexed_async_connection().await {
             Ok(con) => con,
-            Err(_) => return vec![],
+            Err(e) => {
+                error!(guild_id, error = ?e, "Failed to get Redis connection for list");
+                return vec![];
+            }
         };
-        let json_list: Vec<String> = con.lrange(&key, 0, -1).await.unwrap_or_else(|_| vec![]);
-        json_list
+        let json_list: Vec<String> = con.lrange(&key, 0, -1).await.unwrap_or_else(|e| {
+            error!(guild_id, error = ?e, "Failed to fetch queue list from Redis");
+            vec![]
+        });
+        let entries: Vec<QueueEntry> = json_list
             .into_iter()
-            .filter_map(|json_str| serde_json::from_str(&json_str).ok())
-            .collect()
+            .filter_map(|json_str| {
+                serde_json::from_str(&json_str).ok().or_else(|| {
+                    warn!(guild_id, json = %json_str, "Failed to deserialize queue entry");
+                    None
+                })
+            })
+            .collect();
+        debug!(guild_id, count = entries.len(), "Retrieved queue list");
+        entries
     }
 
+    #[instrument(skip(self), fields(guild_id))]
     async fn clear(&self, guild_id: &str) {
         let key = queue_key(guild_id);
         if let Ok(mut con) = self.redis.get_multiplexed_async_connection().await {
-            let _: () = con.del(&key).await.unwrap_or_default();
+            let result: redis::RedisResult<()> = con.del(&key).await;
+            match result {
+                Ok(_) => info!(guild_id, "Cleared queue"),
+                Err(e) => error!(guild_id, error = ?e, "Failed to clear queue in Redis"),
+            }
+        } else {
+            error!(guild_id, "Failed to get Redis connection for clear");
         }
     }
 }

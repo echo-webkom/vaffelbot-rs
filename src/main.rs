@@ -1,5 +1,6 @@
 use std::env;
 
+use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use vaffelbot_rs::{config::Config, VaffelBot};
 
@@ -14,9 +15,12 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
+    info!("Starting VaffelBot");
+
     let config = Config::from_env();
     let bot = VaffelBot::new(config);
     if let Err(why) = bot.run().await {
-        eprintln!("Error running bot: {why:?}");
+        error!(error = ?why, "Error running bot");
+        std::process::exit(1);
     }
 }

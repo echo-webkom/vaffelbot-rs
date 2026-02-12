@@ -3,13 +3,13 @@ use serenity::all::{ActivityData, OnlineStatus};
 use crate::adapters::discord::{check_is_oracle, Context, Error};
 
 /// Åpne for bestilling av vafler
+#[tracing::instrument(name = "open", skip(ctx))]
 #[poise::command(
     prefix_command,
     slash_command,
     rename = "start",
     check = "check_is_oracle"
 )]
-#[tracing::instrument(name = "open", skip(ctx))]
 pub async fn open(ctx: Context<'_>) -> Result<(), Error> {
     let guild_id = ctx.guild_id().unwrap().to_string();
 

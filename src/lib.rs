@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use sqlx::postgres::PgPoolOptions;
-use tracing::error;
+use tracing::{error, instrument};
 
 use crate::{
     adapters::{DiscordAdapter, HttpAdapter},
@@ -23,9 +23,10 @@ impl VaffelBot {
         Self { config }
     }
 
+    #[instrument(skip(self))]
     pub async fn run(self) -> anyhow::Result<()> {
-        let redis = redis::Client::open(self.config.redis_url.clone()).expect("Invalid Redis URL");
-
+        let redis =
+            redis::Client::open(self.config.redis_url.clone()).expect("Failed to connect to Redis");
         let pg_pool = PgPoolOptions::new()
             .max_connections(5)
             .connect(&self.config.database_url)
@@ -44,17 +45,17 @@ impl VaffelBot {
             queue.clone(),
             orders.clone(),
         );
-        let http_adapter = HttpAdapter::new(queue.clone(), orders.clone());
 
+        let http_adapter = HttpAdapter::new(queue.clone(), orders.clone());
         let axum_handle = tokio::spawn(async move {
             if let Err(why) = http_adapter.start().await {
-                error!("HTTP server error: {why:?}");
+                error!(error = ?why, "HTTP server error");
             }
         });
 
         let bot_handle = tokio::spawn(async move {
             if let Err(why) = discord_adapter.start().await {
-                error!("Discord bot error: {why:?}");
+                error!(error = ?why, "Discord bot error");
             }
         });
 

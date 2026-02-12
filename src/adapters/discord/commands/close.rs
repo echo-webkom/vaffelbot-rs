@@ -4,13 +4,13 @@ use tracing::error;
 use crate::adapters::discord::{check_is_oracle, Context, Error};
 
 /// Steng for bestilling av vafler
+#[tracing::instrument(name = "close", skip(ctx))]
 #[poise::command(
     prefix_command,
     slash_command,
     rename = "stopp",
     check = "check_is_oracle"
 )]
-#[tracing::instrument(name = "close", skip(ctx))]
 pub async fn close(ctx: Context<'_>) -> Result<(), Error> {
     let guild_id = ctx.guild_id().unwrap().to_string();
 
@@ -51,7 +51,7 @@ pub async fn close(ctx: Context<'_>) -> Result<(), Error> {
             }
         }
         Err(e) => {
-            error!("Failed to fetch daily stats: {e}");
+            error!(guild_id = %guild_id, error = ?e, "Failed to fetch daily stats");
         }
         _ => {}
     }

@@ -2,8 +2,8 @@ use crate::adapters::discord::{Context, Error};
 use crate::domain::QueueEntry;
 
 /// Få en orakel til å steke vaffel til deg
-#[poise::command(prefix_command, slash_command, rename = "vaffel")]
 #[tracing::instrument(name = "waffle", skip(ctx))]
+#[poise::command(prefix_command, slash_command, rename = "vaffel")]
 pub async fn waffle(ctx: Context<'_>) -> Result<(), Error> {
     let guild_id = ctx.guild_id().unwrap().to_string();
 

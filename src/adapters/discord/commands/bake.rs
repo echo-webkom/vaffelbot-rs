@@ -5,13 +5,13 @@ use crate::adapters::discord::{check_is_oracle, Context, Error};
 use crate::domain::QueueEntry;
 
 /// Stek vaffel
+#[tracing::instrument(name = "bake", skip(ctx))]
 #[poise::command(
     prefix_command,
     slash_command,
     rename = "stekt",
     check = "check_is_oracle"
 )]
-#[tracing::instrument(name = "bake", skip(ctx))]
 pub async fn bake(
     ctx: Context<'_>,
     #[description = "Hvor mange vafler?"] amount: usize,
@@ -68,7 +68,12 @@ pub async fn bake(
             .record_order(&entry.user_id, &guild_id)
             .await
         {
-            error!("Failed to record order for {}: {e}", entry.user_id);
+            error!(
+                user_id = %entry.user_id,
+                guild_id = %guild_id,
+                error = ?e,
+                "Failed to record order"
+            );
         }
     }
 
