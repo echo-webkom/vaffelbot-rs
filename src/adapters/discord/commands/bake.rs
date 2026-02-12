@@ -32,8 +32,7 @@ pub async fn bake(
     }
 
     let message = if baked.is_empty() {
-        let s = "😟 Ingen å steke vafler til.".to_string();
-        s
+        "😟 Ingen å steke vafler til.".to_string()
     } else {
         let mut msg = MessageBuilder::new();
         msg.push("🧇 Stekte ").push(baked.len().to_string());
