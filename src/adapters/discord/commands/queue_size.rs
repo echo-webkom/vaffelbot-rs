@@ -12,7 +12,7 @@ pub async fn queue(ctx: Context<'_>) -> Result<(), Error> {
     }
 
     let user_id = ctx.author().id.to_string();
-    let message = match ctx.data().queue.index_of(&guild_id, user_id).await {
+    let message = match ctx.data().queue.index_of(&guild_id, &user_id).await {
         Some(index) => format!("😎 Du er {} i køen", index + 1),
         None => "🚨 Du er ikke i køen.".to_string(),
     };

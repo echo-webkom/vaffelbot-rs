@@ -2,6 +2,7 @@ use serenity::all::{MessageBuilder, UserId};
 use tracing::error;
 
 use crate::adapters::discord::{check_is_oracle, Context, Error};
+use crate::domain::QueueEntry;
 
 /// Stek vaffel
 #[poise::command(
@@ -22,12 +23,12 @@ pub async fn bake(
         return Ok(());
     }
 
-    let mut baked = vec![];
+    let mut baked: Vec<QueueEntry> = vec![];
     let n = ctx.data().queue.size(&guild_id).await.min(amount);
 
     for _ in 0..n {
-        if let Some(user_id) = ctx.data().queue.pop(&guild_id).await {
-            baked.push(user_id);
+        if let Some(entry) = ctx.data().queue.pop(&guild_id).await {
+            baked.push(entry);
         } else {
             break;
         }
@@ -41,13 +42,13 @@ pub async fn bake(
 
         if baked.len() == 1 {
             msg.push(" en vaffel til: ");
-            let user_id = UserId::new(baked[0].parse::<u64>().unwrap());
+            let user_id = UserId::new(baked[0].user_id.parse::<u64>().unwrap());
             msg.mention(&user_id);
         } else {
             msg.push(" vafler til: ");
 
-            for (i, user_id) in baked.iter().enumerate() {
-                let user_id = UserId::new(user_id.parse::<u64>().unwrap());
+            for (i, entry) in baked.iter().enumerate() {
+                let user_id = UserId::new(entry.user_id.parse::<u64>().unwrap());
 
                 if i == baked.len() - 1 {
                     msg.push(" og ").mention(&user_id);
@@ -60,9 +61,14 @@ pub async fn bake(
         msg.build()
     };
 
-    for user_id in &baked {
-        if let Err(e) = ctx.data().orders.record_order(user_id, &guild_id).await {
-            error!("Failed to record order for {user_id}: {e}");
+    for entry in &baked {
+        if let Err(e) = ctx
+            .data()
+            .orders
+            .record_order(&entry.user_id, &guild_id)
+            .await
+        {
+            error!("Failed to record order for {}: {e}", entry.user_id);
         }
     }
 

@@ -9,7 +9,7 @@ use tracing::info;
 
 use std::{io, sync::Arc};
 
-use crate::domain::{OrderRepository, QueueRepository};
+use crate::domain::{OrderRepository, QueueEntry, QueueRepository};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -49,7 +49,7 @@ impl HttpAdapter {
 async fn list_queue(
     State(state): State<Arc<AppState>>,
     Path(guild_id): Path<String>,
-) -> Json<Vec<String>> {
+) -> Json<Vec<QueueEntry>> {
     let queue = state.queue.list(&guild_id).await;
     Json(queue)
 }

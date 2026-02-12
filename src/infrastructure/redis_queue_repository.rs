@@ -2,7 +2,7 @@ use std::{collections::HashSet, sync::RwLock};
 
 use redis::AsyncCommands;
 
-use crate::domain::QueueRepository;
+use crate::domain::{QueueEntry, QueueRepository};
 
 fn queue_key(guild_id: &str) -> String {
     format!("queue:{guild_id}")
@@ -40,63 +40,65 @@ impl QueueRepository for RedisQueueRepository {
         self.open_guilds.read().unwrap().contains(guild_id)
     }
 
-    async fn index_of(&self, guild_id: &str, target: String) -> Option<usize> {
+    async fn index_of(&self, guild_id: &str, user_id: &str) -> Option<usize> {
         let key = queue_key(guild_id);
         let mut con = self.redis.get_multiplexed_async_connection().await.ok()?;
         let list: Vec<String> = con.lrange(&key, 0, -1).await.ok()?;
 
-        list.iter().position(|item| item == &target)
+        list.iter().position(|json_str| {
+            serde_json::from_str::<QueueEntry>(json_str)
+                .map(|entry| entry.user_id == user_id)
+                .unwrap_or(false)
+        })
     }
 
     async fn size(&self, guild_id: &str) -> usize {
         let key = queue_key(guild_id);
-        let mut con = self
-            .redis
-            .get_multiplexed_async_connection()
-            .await
-            .ok()
-            .unwrap();
+        let mut con = match self.redis.get_multiplexed_async_connection().await {
+            Ok(con) => con,
+            Err(_) => return 0,
+        };
         con.llen(&key).await.unwrap_or(0)
     }
 
-    async fn push(&self, guild_id: &str, value: String) -> usize {
+    async fn push(&self, guild_id: &str, entry: QueueEntry) -> usize {
         let key = queue_key(guild_id);
-        let mut con = self
-            .redis
-            .get_multiplexed_async_connection()
-            .await
-            .ok()
-            .unwrap();
-        con.rpush(&key, value).await.unwrap_or_default()
+        let json = serde_json::to_string(&entry).unwrap();
+        let mut con = match self.redis.get_multiplexed_async_connection().await {
+            Ok(con) => con,
+            Err(_) => return 0,
+        };
+        con.rpush(&key, json).await.unwrap_or_default()
     }
 
-    async fn pop(&self, guild_id: &str) -> Option<String> {
+    async fn pop(&self, guild_id: &str) -> Option<QueueEntry> {
         let key = queue_key(guild_id);
         let mut con = self.redis.get_multiplexed_async_connection().await.ok()?;
         let result: redis::RedisResult<Vec<String>> = con.lpop(&key, None).await;
-        result.ok().and_then(|mut vec| vec.pop())
+        result
+            .ok()
+            .and_then(|mut vec| vec.pop())
+            .and_then(|json_str| serde_json::from_str(&json_str).ok())
     }
 
-    async fn list(&self, guild_id: &str) -> Vec<String> {
+    async fn list(&self, guild_id: &str) -> Vec<QueueEntry> {
         let key = queue_key(guild_id);
-        let mut con = self
-            .redis
-            .get_multiplexed_async_connection()
-            .await
-            .ok()
-            .unwrap();
-        con.lrange(&key, 0, -1).await.unwrap_or_else(|_| vec![])
+        let mut con = match self.redis.get_multiplexed_async_connection().await {
+            Ok(con) => con,
+            Err(_) => return vec![],
+        };
+        let json_list: Vec<String> = con.lrange(&key, 0, -1).await.unwrap_or_else(|_| vec![]);
+        json_list
+            .into_iter()
+            .filter_map(|json_str| serde_json::from_str(&json_str).ok())
+            .collect()
     }
 
     async fn clear(&self, guild_id: &str) {
         let key = queue_key(guild_id);
-        let mut con = self
-            .redis
-            .get_multiplexed_async_connection()
-            .await
-            .ok()
-            .unwrap();
-        let _: () = con.del(&key).await.unwrap_or_default();
+        if let Ok(mut con) = self.redis.get_multiplexed_async_connection().await {
+            let _: () = con.del(&key).await.unwrap_or_default();
+        }
     }
 }
 
@@ -157,67 +159,92 @@ mod tests {
     #[tokio::test]
     async fn test_push_and_pop() {
         let queue = setup().await;
+        let guild = "test-push-and-pop";
+        queue.clear(guild).await;
 
-        queue.push(TEST_GUILD, "foo".to_string()).await;
-        queue.push(TEST_GUILD, "bar".to_string()).await;
+        let foo = QueueEntry::new("foo".to_string(), "Foo User".to_string());
+        let bar = QueueEntry::new("bar".to_string(), "Bar User".to_string());
 
-        assert_eq!(queue.size(TEST_GUILD).await, 2);
-        assert_eq!(queue.index_of(TEST_GUILD, "bar".to_string()).await, Some(1));
+        queue.push(guild, foo.clone()).await;
+        queue.push(guild, bar.clone()).await;
 
-        let popped = queue.pop(TEST_GUILD).await;
-        assert_eq!(popped, Some("foo".to_string()));
-        assert_eq!(queue.size(TEST_GUILD).await, 1);
+        assert_eq!(queue.size(guild).await, 2);
+        assert_eq!(queue.index_of(guild, "bar").await, Some(1));
 
-        let remaining = queue.list(TEST_GUILD).await;
-        assert_eq!(remaining, vec!["bar".to_string()]);
+        let popped = queue.pop(guild).await;
+        assert_eq!(popped, Some(foo));
+        assert_eq!(queue.size(guild).await, 1);
+
+        let remaining = queue.list(guild).await;
+        assert_eq!(remaining, vec![bar]);
     }
 
     #[tokio::test]
     async fn test_list() {
         let queue = setup().await;
+        let guild = "test-list";
+        queue.clear(guild).await;
 
-        queue.push(TEST_GUILD, "foo".to_string()).await;
-        queue.push(TEST_GUILD, "bar".to_string()).await;
+        let foo = QueueEntry::new("foo".to_string(), "Foo User".to_string());
+        let bar = QueueEntry::new("bar".to_string(), "Bar User".to_string());
 
-        let list = queue.list(TEST_GUILD).await;
-        assert_eq!(list, vec!["foo".to_string(), "bar".to_string()]);
+        queue.push(guild, foo.clone()).await;
+        queue.push(guild, bar.clone()).await;
+
+        let list = queue.list(guild).await;
+        assert_eq!(list, vec![foo, bar]);
     }
 
     #[tokio::test]
     async fn test_index_of() {
         let queue = setup().await;
+        let guild = "test-index-of";
+        queue.clear(guild).await;
 
-        queue.push(TEST_GUILD, "foo".to_string()).await;
-        queue.push(TEST_GUILD, "bar".to_string()).await;
+        let foo = QueueEntry::new("foo".to_string(), "Foo User".to_string());
+        let bar = QueueEntry::new("bar".to_string(), "Bar User".to_string());
 
-        assert_eq!(queue.index_of(TEST_GUILD, "foo".to_string()).await, Some(0));
-        assert_eq!(queue.index_of(TEST_GUILD, "bar".to_string()).await, Some(1));
-        assert_eq!(queue.index_of(TEST_GUILD, "baz".to_string()).await, None);
+        queue.push(guild, foo).await;
+        queue.push(guild, bar).await;
+
+        assert_eq!(queue.index_of(guild, "foo").await, Some(0));
+        assert_eq!(queue.index_of(guild, "bar").await, Some(1));
+        assert_eq!(queue.index_of(guild, "baz").await, None);
     }
 
     #[tokio::test]
     async fn test_size() {
         let queue = setup().await;
+        let guild = "test-size";
+        queue.clear(guild).await;
 
-        assert_eq!(queue.size(TEST_GUILD).await, 0);
+        assert_eq!(queue.size(guild).await, 0);
 
-        queue.push(TEST_GUILD, "foo".to_string()).await;
-        queue.push(TEST_GUILD, "bar".to_string()).await;
+        let foo = QueueEntry::new("foo".to_string(), "Foo User".to_string());
+        let bar = QueueEntry::new("bar".to_string(), "Bar User".to_string());
 
-        assert_eq!(queue.size(TEST_GUILD).await, 2);
+        queue.push(guild, foo).await;
+        queue.push(guild, bar).await;
+
+        assert_eq!(queue.size(guild).await, 2);
     }
 
     #[tokio::test]
     async fn test_clear() {
         let queue = setup().await;
+        let guild = "test-clear";
+        queue.clear(guild).await;
 
-        queue.push(TEST_GUILD, "foo".to_string()).await;
-        queue.push(TEST_GUILD, "bar".to_string()).await;
+        let foo = QueueEntry::new("foo".to_string(), "Foo User".to_string());
+        let bar = QueueEntry::new("bar".to_string(), "Bar User".to_string());
 
-        assert_eq!(queue.size(TEST_GUILD).await, 2);
+        queue.push(guild, foo).await;
+        queue.push(guild, bar).await;
 
-        queue.clear(TEST_GUILD).await;
+        assert_eq!(queue.size(guild).await, 2);
 
-        assert_eq!(queue.size(TEST_GUILD).await, 0);
+        queue.clear(guild).await;
+
+        assert_eq!(queue.size(guild).await, 0);
     }
 }

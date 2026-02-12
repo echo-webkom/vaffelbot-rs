@@ -1,3 +1,18 @@
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+pub struct QueueEntry {
+    pub user_id: String,
+    pub display_name: String,
+}
+
+impl QueueEntry {
+    pub fn new(user_id: String, display_name: String) -> Self {
+        Self {
+            user_id,
+            display_name,
+        }
+    }
+}
+
 #[async_trait::async_trait]
 pub trait QueueRepository: Send + Sync {
     /// Open the queue to allow new entries
@@ -9,23 +24,23 @@ pub trait QueueRepository: Send + Sync {
     /// Check if the queue is currently open
     fn is_open(&self, guild_id: &str) -> bool;
 
-    /// Find the position of an item in the queue
-    /// Returns None if the item is not found
-    async fn index_of(&self, guild_id: &str, target: String) -> Option<usize>;
+    /// Find the position of a user in the queue by user_id
+    /// Returns None if the user is not found
+    async fn index_of(&self, guild_id: &str, user_id: &str) -> Option<usize>;
 
     /// Get the current size of the queue
     async fn size(&self, guild_id: &str) -> usize;
 
-    /// Add an item to the end of the queue
+    /// Add a user to the end of the queue
     /// Returns the new size of the queue
-    async fn push(&self, guild_id: &str, value: String) -> usize;
+    async fn push(&self, guild_id: &str, entry: QueueEntry) -> usize;
 
-    /// Remove the item at the front of the queue and return it
+    /// Remove the entry at the front of the queue and return it
     /// Returns None if the queue is empty
-    async fn pop(&self, guild_id: &str) -> Option<String>;
+    async fn pop(&self, guild_id: &str) -> Option<QueueEntry>;
 
-    /// Get all items in the queue
-    async fn list(&self, guild_id: &str) -> Vec<String>;
+    /// Get all entries in the queue
+    async fn list(&self, guild_id: &str) -> Vec<QueueEntry>;
 
     /// Clear the queue
     async fn clear(&self, guild_id: &str);
