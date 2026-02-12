@@ -15,21 +15,43 @@ impl PostgresOrderRepository {
 
 #[async_trait::async_trait]
 impl OrderRepository for PostgresOrderRepository {
-    #[instrument(skip(self), fields(discord_user_id, guild_id))]
-    async fn record_order(&self, discord_user_id: &str, guild_id: &str) -> anyhow::Result<()> {
-        debug!(discord_user_id, guild_id, "Recording order");
+    #[instrument(skip(self), fields(count = discord_user_ids.len(), guild_id))]
+    async fn record_orders(&self, discord_user_ids: &[&str], guild_id: &str) -> anyhow::Result<()> {
+        if discord_user_ids.is_empty() {
+            debug!("No orders to record");
+            return Ok(());
+        }
+
+        debug!(
+            count = discord_user_ids.len(),
+            guild_id, "Recording orders in batch"
+        );
+
+        let discord_user_ids_vec: Vec<String> =
+            discord_user_ids.iter().map(|&s| s.to_string()).collect();
+        let guild_ids: Vec<String> = vec![guild_id.to_string(); discord_user_ids.len()];
+
         sqlx::query!(
-            "INSERT INTO orders (discord_user_id, guild_id) VALUES ($1, $2)",
-            discord_user_id,
-            guild_id
+            "INSERT INTO orders (discord_user_id, guild_id) SELECT * FROM UNNEST($1::text[], $2::text[])",
+            &discord_user_ids_vec[..],
+            &guild_ids[..]
         )
         .execute(&self.pool)
         .await
         .map_err(|e| {
-            error!(discord_user_id, guild_id, error = ?e, "Failed to record order in database");
+            error!(
+                count = discord_user_ids.len(),
+                guild_id,
+                error = ?e,
+                "Failed to record orders in database"
+            );
             e
         })?;
-        info!(discord_user_id, guild_id, "Order recorded successfully");
+
+        info!(
+            count = discord_user_ids.len(),
+            guild_id, "Orders recorded successfully"
+        );
         Ok(())
     }
 

@@ -61,20 +61,13 @@ pub async fn bake(
         msg.build()
     };
 
-    for entry in &baked {
-        if let Err(e) = ctx
-            .data()
-            .orders
-            .record_order(&entry.user_id, &guild_id)
-            .await
-        {
-            error!(
-                user_id = %entry.user_id,
-                guild_id = %guild_id,
-                error = ?e,
-                "Failed to record order"
-            );
-        }
+    let user_ids: Vec<&str> = baked.iter().map(|e| e.user_id.as_str()).collect();
+    if let Err(e) = ctx.data().orders.record_orders(&user_ids, &guild_id).await {
+        error!(
+            guild_id = %guild_id,
+            error = ?e,
+            "Failed to record orders"
+        );
     }
 
     ctx.say(message).await?;

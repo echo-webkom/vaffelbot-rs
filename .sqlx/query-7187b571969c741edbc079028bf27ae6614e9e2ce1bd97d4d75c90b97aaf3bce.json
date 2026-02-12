@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO orders (discord_user_id, guild_id) SELECT * FROM UNNEST($1::text[], $2::text[])",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7187b571969c741edbc079028bf27ae6614e9e2ce1bd97d4d75c90b97aaf3bce"
+}

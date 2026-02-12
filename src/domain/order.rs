@@ -1,6 +1,6 @@
 #[async_trait::async_trait]
 pub trait OrderRepository: Send + Sync {
-    async fn record_order(&self, discord_user_id: &str, guild_id: &str) -> anyhow::Result<()>;
+    async fn record_orders(&self, discord_user_ids: &[&str], guild_id: &str) -> anyhow::Result<()>;
     async fn daily_stats(&self, guild_id: &str) -> anyhow::Result<DailyStats>;
 }
 
