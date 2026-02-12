@@ -15,16 +15,18 @@ pub async fn bake(
     ctx: Context<'_>,
     #[description = "Hvor mange vafler?"] amount: usize,
 ) -> Result<(), Error> {
-    if !ctx.data().queue.is_open() {
+    let guild_id = ctx.guild_id().unwrap().to_string();
+
+    if !ctx.data().queue.is_open(&guild_id) {
         ctx.say("🔒️ Bestilling er stengt").await?;
         return Ok(());
     }
 
     let mut baked = vec![];
-    let n = ctx.data().queue.size().await.min(amount);
+    let n = ctx.data().queue.size(&guild_id).await.min(amount);
 
     for _ in 0..n {
-        if let Some(user_id) = ctx.data().queue.pop().await {
+        if let Some(user_id) = ctx.data().queue.pop(&guild_id).await {
             baked.push(user_id);
         } else {
             break;
@@ -59,7 +61,7 @@ pub async fn bake(
     };
 
     for user_id in &baked {
-        if let Err(e) = ctx.data().orders.record_order(user_id).await {
+        if let Err(e) = ctx.data().orders.record_order(user_id, &guild_id).await {
             error!("Failed to record order for {user_id}: {e}");
         }
     }

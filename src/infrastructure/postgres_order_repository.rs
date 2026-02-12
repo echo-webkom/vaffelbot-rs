@@ -14,19 +14,21 @@ impl PostgresOrderRepository {
 
 #[async_trait::async_trait]
 impl OrderRepository for PostgresOrderRepository {
-    async fn record_order(&self, discord_user_id: &str) -> anyhow::Result<()> {
+    async fn record_order(&self, discord_user_id: &str, guild_id: &str) -> anyhow::Result<()> {
         sqlx::query!(
-            "INSERT INTO orders (discord_user_id) VALUES ($1)",
-            discord_user_id
+            "INSERT INTO orders (discord_user_id, guild_id) VALUES ($1, $2)",
+            discord_user_id,
+            guild_id
         )
         .execute(&self.pool)
         .await?;
         Ok(())
     }
 
-    async fn daily_stats(&self) -> anyhow::Result<DailyStats> {
+    async fn daily_stats(&self, guild_id: &str) -> anyhow::Result<DailyStats> {
         let total = sqlx::query_scalar!(
-            "SELECT COUNT(*) FROM orders WHERE fulfilled_at::date = CURRENT_DATE"
+            "SELECT COUNT(*) FROM orders WHERE fulfilled_at::date = CURRENT_DATE AND guild_id = $1",
+            guild_id
         )
         .fetch_one(&self.pool)
         .await?
@@ -34,10 +36,11 @@ impl OrderRepository for PostgresOrderRepository {
 
         let top_users = sqlx::query!(
             "SELECT discord_user_id, COUNT(*) as count FROM orders \
-             WHERE fulfilled_at::date = CURRENT_DATE \
+             WHERE fulfilled_at::date = CURRENT_DATE AND guild_id = $1 \
              GROUP BY discord_user_id \
              ORDER BY count DESC \
-             LIMIT 3"
+             LIMIT 3",
+            guild_id
         )
         .fetch_all(&self.pool)
         .await?

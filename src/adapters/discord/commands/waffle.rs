@@ -4,20 +4,22 @@ use crate::adapters::discord::{Context, Error};
 #[poise::command(prefix_command, slash_command, rename = "vaffel")]
 #[tracing::instrument(name = "waffle", skip(ctx))]
 pub async fn waffle(ctx: Context<'_>) -> Result<(), Error> {
-    if !ctx.data().queue.is_open() {
+    let guild_id = ctx.guild_id().unwrap().to_string();
+
+    if !ctx.data().queue.is_open(&guild_id) {
         ctx.say("🏮 Bestilling er stengt").await?;
         return Ok(());
     }
 
     let user_id = ctx.author().id.to_string();
-    let message = match ctx.data().queue.index_of(user_id.clone()).await {
+    let message = match ctx.data().queue.index_of(&guild_id, user_id.clone()).await {
         Some(index) => format!(
             "⏲️ Du er **allerede** i køen. Du er nummer **{}** i køen.",
             index + 1
         ),
         None => {
-            let size = ctx.data().queue.size().await;
-            ctx.data().queue.push(user_id).await;
+            let size = ctx.data().queue.size(&guild_id).await;
+            ctx.data().queue.push(&guild_id, user_id).await;
             format!("⏲️ Du er nå i køen. Du er nummer **{}** i køen.", size + 1)
         }
     };

@@ -11,12 +11,14 @@ use crate::adapters::discord::{check_is_oracle, Context, Error};
 )]
 #[tracing::instrument(name = "open", skip(ctx))]
 pub async fn open(ctx: Context<'_>) -> Result<(), Error> {
-    if ctx.data().queue.is_open() {
+    let guild_id = ctx.guild_id().unwrap().to_string();
+
+    if ctx.data().queue.is_open(&guild_id) {
         ctx.say("🔓️ Bestilling er allerede åpnet").await?;
         return Ok(());
     }
 
-    ctx.data().queue.open();
+    ctx.data().queue.open(&guild_id);
     ctx.say("🔓️ Bestilling er nå åpnet").await?;
 
     ctx.serenity_context().set_presence(

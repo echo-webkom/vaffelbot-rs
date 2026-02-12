@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT discord_user_id, COUNT(*) as count FROM orders WHERE fulfilled_at::date = CURRENT_DATE GROUP BY discord_user_id ORDER BY count DESC LIMIT 3",
+  "query": "SELECT discord_user_id, COUNT(*) as count FROM orders WHERE fulfilled_at::date = CURRENT_DATE AND guild_id = $1 GROUP BY discord_user_id ORDER BY count DESC LIMIT 3",
   "describe": {
     "columns": [
       {
@@ -15,12 +15,14 @@
       }
     ],
     "parameters": {
-      "Left": []
+      "Left": [
+        "Text"
+      ]
     },
     "nullable": [
       false,
       null
     ]
   },
-  "hash": "c7e096c290072e439cadbd334e14780b989e518baa62572e5d6cb951d7d682e3"
+  "hash": "3bb5b899ca089eed55edb6c37716428cd4caf8b10836d85e32a5a6d2ae589eba"
 }

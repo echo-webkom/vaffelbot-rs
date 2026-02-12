@@ -12,16 +12,18 @@ use crate::adapters::discord::{check_is_oracle, Context, Error};
 )]
 #[tracing::instrument(name = "close", skip(ctx))]
 pub async fn close(ctx: Context<'_>) -> Result<(), Error> {
-    if !ctx.data().queue.is_open() {
+    let guild_id = ctx.guild_id().unwrap().to_string();
+
+    if !ctx.data().queue.is_open(&guild_id) {
         ctx.say("🔒️ Bestilling er allerede stengt").await?;
         return Ok(());
     }
 
-    ctx.data().queue.close().await;
+    ctx.data().queue.close(&guild_id).await;
 
     let mut message = "🔒️ Bestilling er nå stengt".to_string();
 
-    match ctx.data().orders.daily_stats().await {
+    match ctx.data().orders.daily_stats(&guild_id).await {
         Ok(stats) if stats.total_orders > 0 => {
             let vafler = if stats.total_orders == 1 {
                 "vaffel"

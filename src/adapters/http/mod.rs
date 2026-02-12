@@ -1,4 +1,8 @@
-use axum::{extract::State, routing::get, Json, Router};
+use axum::{
+    extract::{Path, State},
+    routing::get,
+    Json, Router,
+};
 use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
 use tracing::info;
@@ -31,7 +35,7 @@ impl HttpAdapter {
         });
 
         let app = Router::new()
-            .route("/queue", get(list_queue))
+            .route("/{guild_id}/queue", get(list_queue))
             .layer(ServiceBuilder::new().layer(TraceLayer::new_for_http()))
             .with_state(state);
 
@@ -42,7 +46,10 @@ impl HttpAdapter {
     }
 }
 
-async fn list_queue(State(state): State<Arc<AppState>>) -> Json<Vec<String>> {
-    let queue = state.queue.list().await;
+async fn list_queue(
+    State(state): State<Arc<AppState>>,
+    Path(guild_id): Path<String>,
+) -> Json<Vec<String>> {
+    let queue = state.queue.list(&guild_id).await;
     Json(queue)
 }

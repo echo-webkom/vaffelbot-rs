@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO orders (discord_user_id, guild_id) VALUES ($1, $2)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "bfea23a5a6ba80a5e8a52607b5741437c767c0aa8928590674d8c813a97b11d3"
+}
