@@ -1,7 +1,7 @@
 use serenity::all::{MessageBuilder, UserId};
 use tracing::error;
 
-use crate::adapters::discord::{check_is_oracle, Context, Error};
+use crate::adapters::discord::{Context, Error, check_is_oracle};
 
 /// Stek vaffel
 #[tracing::instrument(name = "bake", skip(ctx))]

@@ -1,6 +1,6 @@
 use serenity::all::{ActivityData, OnlineStatus};
 
-use crate::adapters::discord::{check_is_oracle, Context, Error};
+use crate::adapters::discord::{Context, Error, check_is_oracle};
 
 /// Åpne for bestilling av vafler
 #[tracing::instrument(name = "open", skip(ctx))]

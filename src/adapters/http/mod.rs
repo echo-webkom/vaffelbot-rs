@@ -1,7 +1,7 @@
 use axum::{
+    Json, Router,
     extract::{Path, State},
     routing::get,
-    Json, Router,
 };
 use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;

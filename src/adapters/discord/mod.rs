@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use poise::FrameworkOptions;
-use serenity::all::{GatewayIntents, GuildId, RoleId};
 use serenity::Error as SerenityError;
+use serenity::all::{GatewayIntents, GuildId, RoleId};
 
 use crate::domain::{OrderRepository, QueueRepository};
 

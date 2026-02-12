@@ -1,7 +1,7 @@
 use serenity::all::{Mentionable, OnlineStatus, UserId};
 use tracing::error;
 
-use crate::adapters::discord::{check_is_oracle, Context, Error};
+use crate::adapters::discord::{Context, Error, check_is_oracle};
 
 /// Steng for bestilling av vafler
 #[tracing::instrument(name = "close", skip(ctx))]
