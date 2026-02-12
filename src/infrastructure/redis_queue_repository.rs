@@ -1,19 +1,18 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use r2d2::Pool;
-use redis::Commands;
+use redis::AsyncCommands;
 
 use crate::domain::QueueRepository;
 
 const QUEUE_NAME: &str = "queue";
 
 pub struct RedisQueueRepository {
-    redis: Pool<redis::Client>,
+    redis: redis::Client,
     is_open: AtomicBool,
 }
 
 impl RedisQueueRepository {
-    pub fn new(redis: Pool<redis::Client>) -> Self {
+    pub fn new(redis: redis::Client) -> Self {
         Self {
             redis,
             is_open: AtomicBool::new(false),
@@ -21,54 +20,74 @@ impl RedisQueueRepository {
     }
 }
 
+#[async_trait::async_trait]
 impl QueueRepository for RedisQueueRepository {
     fn open(&self) {
         self.is_open.store(true, Ordering::Relaxed);
     }
 
-    fn close(&self) {
+    async fn close(&self) {
         self.is_open.store(false, Ordering::Relaxed);
-        self.clear();
+        self.clear().await;
     }
 
     fn is_open(&self) -> bool {
         self.is_open.load(Ordering::Relaxed)
     }
 
-    fn index_of(&self, target: String) -> Option<usize> {
-        let mut con = self.redis.get().ok()?;
-        let list: Vec<String> = match con.lrange(QUEUE_NAME, 0, -1) {
-            Ok(l) => l,
-            Err(_) => return None,
-        };
+    async fn index_of(&self, target: String) -> Option<usize> {
+        let mut con = self.redis.get_multiplexed_async_connection().await.ok()?;
+        let list: Vec<String> = con.lrange(QUEUE_NAME, 0, -1).await.ok()?;
 
         list.iter().position(|item| item == &target)
     }
 
-    fn size(&self) -> usize {
-        let mut con = self.redis.get().ok().unwrap();
-        con.llen(QUEUE_NAME).unwrap_or(0) as usize
+    async fn size(&self) -> usize {
+        let mut con = self
+            .redis
+            .get_multiplexed_async_connection()
+            .await
+            .ok()
+            .unwrap();
+        con.llen(QUEUE_NAME).await.unwrap_or(0)
     }
 
-    fn push(&self, value: String) -> usize {
-        let mut con = self.redis.get().ok().unwrap();
-        con.rpush(QUEUE_NAME, value).unwrap_or_default()
+    async fn push(&self, value: String) -> usize {
+        let mut con = self
+            .redis
+            .get_multiplexed_async_connection()
+            .await
+            .ok()
+            .unwrap();
+        con.rpush(QUEUE_NAME, value).await.unwrap_or_default()
     }
 
-    fn pop(&self) -> Option<String> {
-        let mut con = self.redis.get().ok()?;
-        let result: redis::RedisResult<Vec<String>> = con.lpop(QUEUE_NAME, None);
+    async fn pop(&self) -> Option<String> {
+        let mut con = self.redis.get_multiplexed_async_connection().await.ok()?;
+        let result: redis::RedisResult<Vec<String>> = con.lpop(QUEUE_NAME, None).await;
         result.ok().and_then(|mut vec| vec.pop())
     }
 
-    fn list(&self) -> Vec<String> {
-        let mut con = self.redis.get().ok().unwrap();
-        con.lrange(QUEUE_NAME, 0, -1).unwrap_or_else(|_| vec![])
+    async fn list(&self) -> Vec<String> {
+        let mut con = self
+            .redis
+            .get_multiplexed_async_connection()
+            .await
+            .ok()
+            .unwrap();
+        con.lrange(QUEUE_NAME, 0, -1)
+            .await
+            .unwrap_or_else(|_| vec![])
     }
 
-    fn clear(&self) {
-        let mut con = self.redis.get().ok().unwrap();
-        con.del::<_, ()>(QUEUE_NAME).ok();
+    async fn clear(&self) {
+        let mut con = self
+            .redis
+            .get_multiplexed_async_connection()
+            .await
+            .ok()
+            .unwrap();
+        let _: () = con.del(QUEUE_NAME).await.unwrap_or_default();
     }
 }
 
@@ -76,108 +95,112 @@ impl QueueRepository for RedisQueueRepository {
 mod tests {
     use super::*;
 
-    use testcontainers::runners::SyncRunner;
+    use testcontainers::runners::AsyncRunner;
     use testcontainers_modules::redis::Redis;
+    use tokio::sync::OnceCell;
 
-    #[test]
-    fn test_push_and_pop() {
-        let node = Redis::default().start().unwrap();
-        let host_ip = node.get_host().unwrap();
-        let host_port = node.get_host_port_ipv4(6379).unwrap();
-        let url = format!("redis://{host_ip}:{host_port}");
-        let client = Pool::builder()
-            .build(redis::Client::open(url).unwrap())
-            .unwrap();
-        let queue = RedisQueueRepository::new(client);
+    struct TestRedis {
+        _node: testcontainers::ContainerAsync<Redis>,
+        client: redis::Client,
+    }
 
-        queue.push("foo".to_string());
-        queue.push("bar".to_string());
+    static REDIS: OnceCell<TestRedis> = OnceCell::const_new();
 
-        assert_eq!(queue.size(), 2);
-        assert_eq!(queue.index_of("bar".to_string()), Some(1));
+    async fn init_redis() -> &'static TestRedis {
+        REDIS
+            .get_or_init(|| async {
+                if std::env::var("DOCKER_HOST").is_err() {
+                    let home = std::env::var("HOME").unwrap();
+                    let socket = format!("{home}/.colima/default/docker.sock");
+                    if std::path::Path::new(&socket).exists() {
+                        std::env::set_var("DOCKER_HOST", format!("unix://{socket}"));
+                    }
+                }
 
-        let popped = queue.pop();
+                let node = Redis::default().start().await.unwrap();
+                let host_ip = node.get_host().await.unwrap();
+                let host_port = node.get_host_port_ipv4(6379).await.unwrap();
+                let url = format!("redis://{host_ip}:{host_port}");
+                let client = redis::Client::open(url).unwrap();
+                TestRedis {
+                    _node: node,
+                    client,
+                }
+            })
+            .await
+    }
+
+    async fn setup() -> RedisQueueRepository {
+        let redis = init_redis().await;
+        let queue = RedisQueueRepository::new(redis.client.clone());
+        queue.clear().await;
+        queue
+    }
+
+    #[tokio::test]
+    async fn test_push_and_pop() {
+        let queue = setup().await;
+
+        queue.push("foo".to_string()).await;
+        queue.push("bar".to_string()).await;
+
+        assert_eq!(queue.size().await, 2);
+        assert_eq!(queue.index_of("bar".to_string()).await, Some(1));
+
+        let popped = queue.pop().await;
         assert_eq!(popped, Some("foo".to_string()));
-        assert_eq!(queue.size(), 1);
+        assert_eq!(queue.size().await, 1);
 
-        let remaining = queue.list();
+        let remaining = queue.list().await;
         assert_eq!(remaining, vec!["bar".to_string()]);
     }
 
-    #[test]
-    fn test_list() {
-        let node = Redis::default().start().unwrap();
-        let host_ip = node.get_host().unwrap();
-        let host_port = node.get_host_port_ipv4(6379).unwrap();
-        let url = format!("redis://{host_ip}:{host_port}");
-        let client = Pool::builder()
-            .build(redis::Client::open(url).unwrap())
-            .unwrap();
-        let queue = RedisQueueRepository::new(client);
+    #[tokio::test]
+    async fn test_list() {
+        let queue = setup().await;
 
-        queue.push("foo".to_string());
-        queue.push("bar".to_string());
+        queue.push("foo".to_string()).await;
+        queue.push("bar".to_string()).await;
 
-        let list = queue.list();
+        let list = queue.list().await;
         assert_eq!(list, vec!["foo".to_string(), "bar".to_string()]);
     }
 
-    #[test]
-    fn test_index_of() {
-        let node = Redis::default().start().unwrap();
-        let host_ip = node.get_host().unwrap();
-        let host_port = node.get_host_port_ipv4(6379).unwrap();
-        let url = format!("redis://{host_ip}:{host_port}");
-        let client = Pool::builder()
-            .build(redis::Client::open(url).unwrap())
-            .unwrap();
-        let queue = RedisQueueRepository::new(client);
+    #[tokio::test]
+    async fn test_index_of() {
+        let queue = setup().await;
 
-        queue.push("foo".to_string());
-        queue.push("bar".to_string());
+        queue.push("foo".to_string()).await;
+        queue.push("bar".to_string()).await;
 
-        assert_eq!(queue.index_of("foo".to_string()), Some(0));
-        assert_eq!(queue.index_of("bar".to_string()), Some(1));
-        assert_eq!(queue.index_of("baz".to_string()), None);
+        assert_eq!(queue.index_of("foo".to_string()).await, Some(0));
+        assert_eq!(queue.index_of("bar".to_string()).await, Some(1));
+        assert_eq!(queue.index_of("baz".to_string()).await, None);
     }
 
-    #[test]
-    fn test_size() {
-        let node = Redis::default().start().unwrap();
-        let host_ip = node.get_host().unwrap();
-        let host_port = node.get_host_port_ipv4(6379).unwrap();
-        let url = format!("redis://{host_ip}:{host_port}");
-        let client = Pool::builder()
-            .build(redis::Client::open(url).unwrap())
-            .unwrap();
-        let queue = RedisQueueRepository::new(client);
+    #[tokio::test]
+    async fn test_size() {
+        let queue = setup().await;
 
-        assert_eq!(queue.size(), 0);
+        assert_eq!(queue.size().await, 0);
 
-        queue.push("foo".to_string());
-        queue.push("bar".to_string());
+        queue.push("foo".to_string()).await;
+        queue.push("bar".to_string()).await;
 
-        assert_eq!(queue.size(), 2);
+        assert_eq!(queue.size().await, 2);
     }
 
-    #[test]
-    fn test_clear() {
-        let node = Redis::default().start().unwrap();
-        let host_ip = node.get_host().unwrap();
-        let host_port = node.get_host_port_ipv4(6379).unwrap();
-        let url = format!("redis://{host_ip}:{host_port}");
-        let client = Pool::builder()
-            .build(redis::Client::open(url).unwrap())
-            .unwrap();
-        let queue = RedisQueueRepository::new(client);
+    #[tokio::test]
+    async fn test_clear() {
+        let queue = setup().await;
 
-        queue.push("foo".to_string());
-        queue.push("bar".to_string());
+        queue.push("foo".to_string()).await;
+        queue.push("bar".to_string()).await;
 
-        assert_eq!(queue.size(), 2);
+        assert_eq!(queue.size().await, 2);
 
-        queue.clear();
+        queue.clear().await;
 
-        assert_eq!(queue.size(), 0);
+        assert_eq!(queue.size().await, 0);
     }
 }

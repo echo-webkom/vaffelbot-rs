@@ -43,6 +43,6 @@ impl HttpAdapter {
 }
 
 async fn list_queue(State(state): State<Arc<AppState>>) -> Json<Vec<String>> {
-    let queue = state.queue.list();
+    let queue = state.queue.list().await;
     Json(queue)
 }

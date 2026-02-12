@@ -21,10 +21,10 @@ pub async fn bake(
     }
 
     let mut baked = vec![];
-    let n = ctx.data().queue.size().min(amount);
+    let n = ctx.data().queue.size().await.min(amount);
 
     for _ in 0..n {
-        if let Some(user_id) = ctx.data().queue.pop() {
+        if let Some(user_id) = ctx.data().queue.pop().await {
             baked.push(user_id);
         } else {
             break;

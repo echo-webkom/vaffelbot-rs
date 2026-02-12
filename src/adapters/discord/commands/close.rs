@@ -17,7 +17,7 @@ pub async fn close(ctx: Context<'_>) -> Result<(), Error> {
         return Ok(());
     }
 
-    ctx.data().queue.close();
+    ctx.data().queue.close().await;
 
     let mut message = "🔒️ Bestilling er nå stengt".to_string();
 

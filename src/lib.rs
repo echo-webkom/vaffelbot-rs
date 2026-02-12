@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use r2d2::Pool;
 use sqlx::postgres::PgPoolOptions;
 use tracing::error;
 
@@ -26,9 +25,6 @@ impl VaffelBot {
 
     pub async fn run(self) -> anyhow::Result<()> {
         let redis = redis::Client::open(self.config.redis_url.clone()).expect("Invalid Redis URL");
-        let redis_pool = Pool::builder()
-            .build(redis)
-            .expect("Failed to create Redis connection pool");
 
         let pg_pool = PgPoolOptions::new()
             .max_connections(5)
@@ -38,8 +34,7 @@ impl VaffelBot {
 
         sqlx::migrate!().run(&pg_pool).await?;
 
-        let queue: Arc<dyn domain::QueueRepository> =
-            Arc::new(RedisQueueRepository::new(redis_pool));
+        let queue: Arc<dyn domain::QueueRepository> = Arc::new(RedisQueueRepository::new(redis));
 
         let orders: Arc<dyn domain::OrderRepository> =
             Arc::new(PostgresOrderRepository::new(pg_pool));
