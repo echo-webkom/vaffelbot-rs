@@ -231,10 +231,12 @@ mod tests {
                         .expect("Failed to get home directory")
                         .join(".colima/default/docker.sock");
                     if std::path::Path::new(&socket).exists() {
-                        std::env::set_var(
-                            "DOCKER_HOST",
-                            format!("unix://{}", socket.to_string_lossy()),
-                        );
+                        unsafe {
+                            std::env::set_var(
+                                "DOCKER_HOST",
+                                format!("unix://{}", socket.to_string_lossy()),
+                            );
+                        }
                     }
                 }
 
