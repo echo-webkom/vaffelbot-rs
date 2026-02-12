@@ -39,6 +39,9 @@ pub trait QueueRepository: Send + Sync {
     /// Returns None if the queue is empty
     async fn pop(&self, guild_id: &str) -> Option<QueueEntry>;
 
+    /// Remove up to `n` entries from the front of the queue
+    async fn pop_n(&self, guild_id: &str, n: usize) -> Vec<QueueEntry>;
+
     /// Get all entries in the queue
     async fn list(&self, guild_id: &str) -> Vec<QueueEntry>;
 

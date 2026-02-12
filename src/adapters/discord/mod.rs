@@ -1,10 +1,11 @@
 pub mod commands;
 
-use serenity::Error as SerenityError;
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
 
 use poise::FrameworkOptions;
-use serenity::all::GatewayIntents;
+use serenity::all::{GatewayIntents, GuildId, RoleId};
+use serenity::Error as SerenityError;
 
 use crate::domain::{OrderRepository, QueueRepository};
 
@@ -16,6 +17,7 @@ pub type Context<'a> = poise::Context<'a, Data, Error>;
 pub struct Data {
     pub queue: Arc<dyn QueueRepository>,
     pub orders: Arc<dyn OrderRepository>,
+    pub oracle_roles: RwLock<HashMap<GuildId, RoleId>>,
 }
 
 pub struct DiscordAdapter {
@@ -61,6 +63,7 @@ impl DiscordAdapter {
                     Ok(Data {
                         queue: self.queue.clone(),
                         orders: self.orders.clone(),
+                        oracle_roles: RwLock::new(HashMap::new()),
                     })
                 })
             })
@@ -79,24 +82,72 @@ impl DiscordAdapter {
 }
 
 pub async fn check_is_oracle(ctx: Context<'_>) -> Result<bool, Error> {
-    if let Ok(member) = ctx.guild_id().unwrap().member(ctx, ctx.author().id).await {
-        if let Some(guild_id) = ctx.guild_id() {
-            if let Ok(roles) = guild_id.roles(ctx).await {
-                if let Some(orakel_role_id) = roles
-                    .values()
-                    .find(|r| r.name.to_lowercase() == "orakel")
-                    .map(|r| r.id)
-                {
-                    if member.roles.contains(&orakel_role_id) {
-                        return Ok(true);
-                    }
+    let guild_id = match ctx.guild_id() {
+        Some(id) => id,
+        None => {
+            deny(ctx).await?;
+            return Ok(false);
+        }
+    };
+
+    // For slash commands, the member is already in the interaction data (no API call).
+    let member = match ctx.author_member().await {
+        Some(member) => member,
+        None => {
+            deny(ctx).await?;
+            return Ok(false);
+        }
+    };
+
+    // Check cache for the orakel role ID
+    let cached = ctx
+        .data()
+        .oracle_roles
+        .read()
+        .unwrap()
+        .get(&guild_id)
+        .copied();
+
+    let orakel_role_id = match cached {
+        Some(id) => id,
+        None => {
+            let roles = match guild_id.roles(ctx).await {
+                Ok(roles) => roles,
+                Err(_) => {
+                    deny(ctx).await?;
+                    return Ok(false);
+                }
+            };
+
+            match roles.values().find(|r| r.name.to_lowercase() == "orakel") {
+                Some(role) => {
+                    let id = role.id;
+                    ctx.data()
+                        .oracle_roles
+                        .write()
+                        .unwrap()
+                        .insert(guild_id, id);
+                    id
+                }
+                None => {
+                    deny(ctx).await?;
+                    return Ok(false);
                 }
             }
         }
+    };
+
+    if member.roles.contains(&orakel_role_id) {
+        return Ok(true);
     }
 
+    deny(ctx).await?;
+    Ok(false)
+}
+
+async fn deny(ctx: Context<'_>) -> Result<(), Error> {
     // Send message to discord to prevent timeout.
-    // Dsicord expects a response within 3 seconds. Just
+    // Discord expects a response within 3 seconds. Just
     // returning false does not respond to the interaction.
     ctx.send(
         poise::CreateReply::default()
@@ -104,5 +155,5 @@ pub async fn check_is_oracle(ctx: Context<'_>) -> Result<bool, Error> {
             .ephemeral(true),
     )
     .await?;
-    Ok(false)
+    Ok(())
 }

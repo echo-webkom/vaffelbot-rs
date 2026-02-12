@@ -137,6 +137,31 @@ impl QueueRepository for RedisQueueRepository {
         entry
     }
 
+    #[instrument(skip(self), fields(guild_id, n))]
+    async fn pop_n(&self, guild_id: &str, n: usize) -> Vec<QueueEntry> {
+        if n == 0 {
+            return vec![];
+        }
+
+        let key = queue_key(guild_id);
+        let mut con = match self.redis.get_multiplexed_async_connection().await {
+            Ok(con) => con,
+            Err(e) => {
+                error!(guild_id, error = ?e, "Failed to get Redis connection for pop_n");
+                return vec![];
+            }
+        };
+        let count = std::num::NonZeroUsize::new(n);
+        let result: redis::RedisResult<Vec<String>> = con.lpop(&key, count).await;
+        let entries: Vec<QueueEntry> = result
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|json_str| serde_json::from_str(&json_str).ok())
+            .collect();
+        info!(guild_id, count = entries.len(), "Popped entries from queue");
+        entries
+    }
+
     #[instrument(skip(self), fields(guild_id))]
     async fn list(&self, guild_id: &str) -> Vec<QueueEntry> {
         let key = queue_key(guild_id);

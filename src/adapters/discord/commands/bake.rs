@@ -2,7 +2,6 @@ use serenity::all::{MessageBuilder, UserId};
 use tracing::error;
 
 use crate::adapters::discord::{check_is_oracle, Context, Error};
-use crate::domain::QueueEntry;
 
 /// Stek vaffel
 #[tracing::instrument(name = "bake", skip(ctx))]
@@ -23,16 +22,8 @@ pub async fn bake(
         return Ok(());
     }
 
-    let mut baked: Vec<QueueEntry> = vec![];
     let n = ctx.data().queue.size(&guild_id).await.min(amount);
-
-    for _ in 0..n {
-        if let Some(entry) = ctx.data().queue.pop(&guild_id).await {
-            baked.push(entry);
-        } else {
-            break;
-        }
-    }
+    let baked = ctx.data().queue.pop_n(&guild_id, n).await;
 
     let message = if baked.is_empty() {
         "😟 Ingen å steke vafler til.".to_string()
