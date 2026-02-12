@@ -10,7 +10,9 @@ RUN cargo chef prepare
 FROM chef AS builder
 COPY --from=planner /app/recipe.json .
 RUN cargo chef cook --release
-COPY . .
+COPY ./src ./src
+COPY ./migrations ./migrations
+COPY ./.sqlx ./.sqlx
 ENV SQLX_OFFLINE=true
 RUN cargo build --release
 RUN mv ./target/release/vaffelbot-rs ./vaffelbot-rs
